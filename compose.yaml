@@ -1,0 +1,59 @@
+name: dromos
+
+services:
+  database:
+    image: mysql:8.4
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - database_data:/var/lib/mysql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mysqladmin ping -h 127.0.0.1 -u root -p"$${MYSQL_ROOT_PASSWORD}" --silent
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  app:
+    build:
+      context: .
+      target: app
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    depends_on:
+      database:
+        condition: service_healthy
+    volumes:
+      - app_storage:/var/www/html/storage
+    healthcheck:
+      test:
+        - CMD
+        - php
+        - -r
+        - "$$socket = @fsockopen('127.0.0.1', 9000); exit($$socket ? 0 : 1);"
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+
+  web:
+    build:
+      context: .
+      target: web
+    restart: unless-stopped
+    ports:
+      - "4000:80"
+    depends_on:
+      app:
+        condition: service_healthy
+
+volumes:
+  app_storage:
+  database_data:
