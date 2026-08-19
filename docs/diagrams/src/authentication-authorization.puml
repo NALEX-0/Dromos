@@ -1,0 +1,34 @@
+@startuml
+title Dromos - Authentication and route ownership
+skinparam shadowing false
+
+start
+if (Authenticated session?) then (no)
+  :Show login or registration page;
+  :Validate credentials/account data;
+  if (Valid?) then (yes)
+    :Authenticate user;
+    :Regenerate session ID;
+  else (no)
+    :Return validation/authentication errors;
+    stop
+  endif
+endif
+
+:Pass auth middleware;
+
+if (Creating a route?) then (yes)
+  :Assign authenticated user's ID to route_plan;
+  :Create route and redirect to workspace;
+else (accessing or changing a saved route)
+  :Resolve RoutePlan model;
+  :Run RoutePlanPolicy ownership check;
+  if (route_plan.user_id equals current user ID?) then (yes)
+    :Allow view/update/delete-stop/reorder operation;
+  else (no)
+    :Return HTTP 403 Forbidden;
+  endif
+endif
+
+stop
+@enduml

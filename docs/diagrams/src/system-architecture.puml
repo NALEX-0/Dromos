@@ -1,0 +1,57 @@
+@startuml
+title Dromos - System architecture
+left to right direction
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+actor "Authenticated user" as User
+
+package "Browser" {
+  component "Laravel Blade UI\n(route planner)" as UI
+  component "Google Maps JavaScript\n(map + stored polylines)" as MapsJS
+}
+
+package "Laravel application" {
+  component "Web routes + auth middleware" as Routes
+  component "Controllers + Form Requests" as HTTP
+  component "Route actions" as Actions
+  component "Geocoder contract" as Geocoder
+  component "CachedGeocoder" as CachedGeocoder
+  component "RouteOptimizer contract" as Optimizer
+  component "Google/Demo providers" as Providers
+  component "Eloquent models" as Models
+}
+
+database "MySQL" as DB
+cloud "Google Geocoding API" as GeocodingAPI
+cloud "Google Routes API" as RoutesAPI
+cloud "Google Maps JavaScript API" as MapsAPI
+
+User --> UI
+UI --> Routes : HTTP requests
+Routes --> HTTP
+HTTP --> Actions
+Actions --> Geocoder
+Geocoder --> CachedGeocoder
+CachedGeocoder --> DB : read/write shared address cache
+CachedGeocoder --> Providers : cache miss
+Actions --> Optimizer
+Optimizer --> Providers
+Actions --> Models
+Models --> DB : plans, stops, users, sessions
+Providers --> GeocodingAPI : server key
+Providers --> RoutesAPI : server key
+UI --> MapsJS
+MapsJS --> MapsAPI : restricted browser key
+DB --> UI : saved totals, stops, polylines
+
+note bottom of GeocodingAPI
+  Server credentials never enter the browser.
+end note
+
+note bottom of MapsAPI
+  Browser key is restricted by API and HTTP referrer.
+end note
+@enduml
+

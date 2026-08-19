@@ -1,0 +1,48 @@
+@startuml
+title Dromos - Edit a saved route and recalculate automatically
+autonumber
+skinparam shadowing false
+
+actor User
+boundary "Route workspace" as UI
+control RoutePlanController
+control "Route mutation action" as Action
+database MySQL
+participant "RouteOptimizer / CalculateOrderedRoute" as Calculator
+participant "Google Routes API" as RoutesAPI
+
+User -> UI : Drag/drop, move, add, update or delete a stop
+UI -> RoutePlanController : PATCH/POST/DELETE route endpoint
+RoutePlanController -> RoutePlanController : Validate input
+RoutePlanController -> RoutePlanController : Authorize route ownership
+RoutePlanController -> Action : execute(route, change)
+
+Action -> MySQL : load route and existing stop coordinates
+note right of MySQL
+  Unchanged stops reuse stored coordinates.
+  Only a newly added or changed address needs geocoding.
+end note
+
+alt Optimized route
+  Action -> Calculator : calculate current forced order / options
+  Calculator -> RoutesAPI : one road-route request
+else Sequential route
+  Action -> Calculator : calculate in exact user order
+  loop Each overlapping section of at most 12 points
+    Calculator -> RoutesAPI : road-route request
+  end
+end
+
+RoutesAPI --> Calculator : legs, duration, distance, polyline(s)
+Calculator --> Action : aggregate result
+Action -> MySQL : transaction: update order, legs, totals and polyline(s)
+Action --> RoutePlanController : updated route
+RoutePlanController --> UI : redirect with fresh route data
+UI --> User : updated order, totals and road-following map
+
+note over Action,RoutesAPI
+  Geocoding cache reduces address lookup calls.
+  It cannot remove the Routes API call required after the path changes.
+end note
+@enduml
+

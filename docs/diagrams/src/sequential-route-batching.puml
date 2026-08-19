@@ -1,0 +1,36 @@
+@startuml
+title Dromos - Sequential route batching (up to 100 destinations)
+skinparam shadowing false
+
+start
+:Validate start, ordered destinations and options;
+:Geocode addresses through CachedGeocoder;
+:Build point list in the user's exact order;
+
+if (Return to start?) then (yes)
+  :Append the start point to the end;
+endif
+
+:Initialize aggregated distance, duration,\nlegs, provider responses and polylines;
+
+while (At least two unprocessed points remain?) is (yes)
+  :Take at most 12 points\n(origin + 10 intermediates + destination);
+  :Request an in-order economy route;
+  note right
+    No waypoint optimization.
+    No live-traffic routing.
+    Toll avoidance is forwarded when enabled.
+  end note
+  :Append section legs, totals, response and polyline;
+  :Advance to the section destination;
+  note right
+    The previous destination becomes the next
+    origin, so adjacent sections overlap by one point.
+  end note
+endwhile (no)
+
+:Store one route_plan, all stops, aggregate totals,\nand multiple encoded polylines;
+:Render the complete route as connected road sections;
+stop
+@enduml
+

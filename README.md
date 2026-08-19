@@ -32,6 +32,8 @@ Laravel also creates framework tables for users, sessions, password resets, cach
 - `CalculateOrderedRoute` batches large sequential routes and aggregates their legs, totals, provider responses, and polylines.
 - Google and demo implementations are selected through `ROUTING_PROVIDER`.
 
+PlantUML sources for the system architecture, data model, core route workflows, and authentication flow are documented in [docs/diagrams](docs/diagrams/README.md).
+
 ## Local setup
 
 ```bash

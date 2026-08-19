@@ -1,0 +1,50 @@
+@startuml
+title Dromos - Create an optimized route (up to 25 destinations)
+autonumber
+skinparam shadowing false
+
+actor User
+boundary Browser
+control RoutePlanController
+control CreateOptimizedRoutePlan
+control CachedGeocoder
+database MySQL
+participant "Google Geocoding API" as Geocoding
+participant "RouteOptimizer" as Optimizer
+participant "Google Routes API" as RoutesAPI
+
+User -> Browser : Submit start, destinations and options
+Browser -> RoutePlanController : POST /routes
+RoutePlanController -> RoutePlanController : Validate request and destination limit
+RoutePlanController -> CreateOptimizedRoutePlan : execute(validated input, user)
+
+loop Start and every destination
+  CreateOptimizedRoutePlan -> CachedGeocoder : geocode(full address)
+  CachedGeocoder -> MySQL : find normalized address
+  alt Cache hit
+    MySQL --> CachedGeocoder : saved coordinates + Place ID
+    CachedGeocoder -> MySQL : increment hit_count, update last_used_at
+  else Cache miss
+    CachedGeocoder -> Geocoding : geocode using server credential
+    Geocoding --> CachedGeocoder : verified address + coordinates + Place ID
+    CachedGeocoder -> MySQL : store reusable geocoding result
+  end
+  CachedGeocoder --> CreateOptimizedRoutePlan : geocoded location
+end
+
+CreateOptimizedRoutePlan -> Optimizer : optimize by driving time\n(options include toll avoidance/return)
+Optimizer -> RoutesAPI : computeRoutes with waypoint optimization\nand traffic-aware routing
+RoutesAPI --> Optimizer : optimized order, legs, totals, polyline
+Optimizer --> CreateOptimizedRoutePlan : route result
+CreateOptimizedRoutePlan -> MySQL : transaction: save route_plan + ordered stops
+CreateOptimizedRoutePlan --> RoutePlanController : saved plan
+RoutePlanController --> Browser : redirect to route workspace
+Browser -> MySQL : page request loads saved data through Laravel
+Browser -> Browser : render ordered list and stored road polyline
+
+note over Browser,MySQL
+  Refreshing an unchanged saved route reads the database;
+  it does not geocode or calculate the route again.
+end note
+@enduml
+
