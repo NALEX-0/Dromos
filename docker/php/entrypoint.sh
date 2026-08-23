@@ -51,6 +51,7 @@ until php -r '
 done
 
 echo "Preparing Dromos..."
+php docker/php/prefix-tables.php
 php artisan migrate --force
 php artisan config:cache
 php artisan view:cache

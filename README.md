@@ -52,6 +52,7 @@ DB_PORT=3306
 DB_DATABASE=dromos
 DB_USERNAME=your_database_user
 DB_PASSWORD=your_database_password
+DB_PREFIX=dro_
 ```
 
 ## Google Maps configuration

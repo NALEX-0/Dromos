@@ -27,6 +27,8 @@ services:
     restart: unless-stopped
     env_file:
       - .env.docker
+    environment:
+      DB_PREFIX: dro_
     depends_on:
       database:
         condition: service_healthy
