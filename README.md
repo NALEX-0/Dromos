@@ -21,18 +21,6 @@ The main database tables have distinct API-saving responsibilities:
 | `stops` | Stores the start and destinations, verified coordinates, Place IDs, order, and leg estimates. | Reordering, deleting, or recalculating an existing route reuses stored coordinates and does not geocode unchanged stops. A Routes API call is still required to calculate the changed road route. |
 | `geocoded_address_cache` | Stores normalized addresses and their verified coordinates across all routes. | Reusing the same address in another route avoids another Geocoding API request. `hit_count` measures these cross-route/cache lookups, not ordinary route recalculations. |
 
-Laravel also creates framework tables for users, sessions, password resets, cache, queued jobs, failed jobs, job batches, and migration history.
-
-## Architecture
-
-- Models persist route plans, stops, and cached geocoding results.
-- Form requests validate optimized and sequential route limits.
-- Actions own transactional workflows for creating, reordering, adding, updating, and deleting stops.
-- `CachedGeocoder` decorates the configured geocoder and transparently handles persistent cache hits and misses.
-- `CalculateOrderedRoute` batches large sequential routes and aggregates their legs, totals, provider responses, and polylines.
-- Google and demo implementations are selected through `ROUTING_PROVIDER`.
-
-PlantUML sources for the system architecture, data model, core route workflows, and authentication flow are documented in [docs/diagrams](docs/diagrams/README.md).
 
 ## Local setup
 
