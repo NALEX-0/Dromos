@@ -30,8 +30,7 @@
                 <button class="button button-wide">Σύνδεση <span>→</span></button>
             </form>
 
-            {{-- Public registration is temporarily disabled. --}}
-            {{-- <p class="auth-switch">Δεν έχετε λογαριασμό; <a href="{{ route('register') }}">Δημιουργία λογαριασμού</a></p> --}}
+            <p class="auth-switch">Δεν έχετε λογαριασμό; <a href="{{ route('register') }}">Δημιουργία λογαριασμού</a></p>
         </div>
     </section>
 @endsection

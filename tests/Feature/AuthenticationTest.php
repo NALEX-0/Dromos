@@ -17,19 +17,24 @@ class AuthenticationTest extends TestCase
         $this->get(route('ordered-route-plans.create'))->assertRedirect(route('login'));
     }
 
-    public function test_public_registration_is_disabled(): void
+    public function test_a_guest_can_register(): void
     {
-        $this->get('/register')->assertNotFound();
+        $this->get(route('register'))
+            ->assertOk()
+            ->assertSee('Δημιουργία λογαριασμού');
 
-        $this->post('/register', [
+        $this->post(route('register'), [
             'name' => 'Νίκος',
             'email' => 'nikos@example.com',
             'password' => 'password123',
             'password_confirmation' => 'password123',
-        ])->assertNotFound();
+        ])->assertRedirect(route('route-plans.create'));
 
-        $this->assertGuest();
-        $this->assertDatabaseMissing('users', ['email' => 'nikos@example.com']);
+        $this->assertAuthenticated();
+        $this->assertDatabaseHas('users', [
+            'name' => 'Νίκος',
+            'email' => 'nikos@example.com',
+        ]);
     }
 
     public function test_a_user_can_log_in_and_log_out(): void

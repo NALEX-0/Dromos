@@ -24,12 +24,20 @@ The main database tables have distinct API-saving responsibilities:
 
 ## Local setup
 
+### Option 1: Native Laravel
+
+Requirements: PHP 8.4, Composer, Node.js 22, and MySQL/MariaDB.
+
 ```bash
+cp .env.example .env
 composer install
 npm install
+php artisan key:generate
 php artisan migrate
 composer run dev
 ```
+
+Open the local URL shown by Laravel and select **Εγγραφή** to create your first account.
 
 The application currently uses MySQL/MariaDB. Configure a database in `.env`:
 
@@ -42,6 +50,52 @@ DB_USERNAME=your_database_user
 DB_PASSWORD=your_database_password
 DB_PREFIX=dro_
 ```
+
+### Option 2: Docker
+
+Requirements: Docker Desktop, or Docker Engine with Docker Compose.
+
+1. Create the Docker environment file:
+
+```bash
+cp .env.docker.example .env.docker
+```
+
+2. Edit `.env.docker` and set secure database passwords and your Google Maps keys:
+
+```dotenv
+GOOGLE_MAPS_SERVER_KEY=your_server_only_key
+GOOGLE_MAPS_BROWSER_KEY=your_browser_key
+
+DB_PASSWORD=choose-a-database-password
+MYSQL_PASSWORD=choose-the-same-database-password
+MYSQL_ROOT_PASSWORD=choose-a-different-root-password
+```
+
+`DB_PASSWORD` and `MYSQL_PASSWORD` must have the same value. `APP_KEY` may remain empty; Docker generates it on the first start and keeps it in the persistent application-storage volume.
+
+3. Build and start Dromos:
+
+```bash
+docker compose up -d --build
+```
+
+The application waits for MySQL, applies the `dro_` table prefix, and runs database migrations automatically. Open [http://localhost:4000](http://localhost:4000), select **Εγγραφή**, and create your account.
+
+Useful Docker commands:
+
+```bash
+# Follow application and web-server output
+docker compose logs -f app web
+
+# Stop Dromos without deleting its data
+docker compose down
+
+# Rebuild after pulling code changes
+docker compose up -d --build
+```
+
+MySQL data and Laravel storage are kept in the named `database_data` and `app_storage` volumes, so normal restarts and `docker compose down` preserve them. Running `docker compose down -v` deletes both volumes and permanently removes the local database and generated application key.
 
 ## Google Maps configuration
 

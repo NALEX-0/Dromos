@@ -49,8 +49,7 @@
             @else
                 <div class="guest-nav">
                     <a href="{{ route('login') }}">Σύνδεση</a>
-                    {{-- Public registration is temporarily disabled. --}}
-                    {{-- <a href="{{ route('register') }}" class="guest-register">Εγγραφή</a> --}}
+                    <a href="{{ route('register') }}" class="guest-register">Εγγραφή</a>
                 </div>
             @endauth
         </nav>
