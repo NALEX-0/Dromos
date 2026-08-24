@@ -182,6 +182,9 @@
                             </button>
                         @endforeach
                     </div>
+                    <button type="button" id="open-export-addresses" class="export-addresses-button">
+                        Εξαγωγή διευθύνσεων
+                    </button>
                 </div>
 
                 <div class="fixed-origin">
@@ -199,6 +202,13 @@
 
                     <div id="ordered-stops" class="ordered-list">
                         @foreach ($visits as $stop)
+                            @php
+                                $googleMapsLocation = $stop->formatted_address ?: $stop->address;
+                                $stopGoogleMapsUrl = 'https://www.google.com/maps/search/?'.http_build_query([
+                                    'api' => 1,
+                                    'query' => $googleMapsLocation,
+                                ], '', '&', PHP_QUERY_RFC3986);
+                            @endphp
                             <article class="ordered-stop" draggable="true" data-stop-id="{{ $stop->id }}">
                                 <input type="hidden" name="stop_ids[]" value="{{ $stop->id }}">
                                 <span class="drag-handle" title="Σύρετε για αλλαγή σειράς" aria-hidden="true">⠿</span>
@@ -214,6 +224,13 @@
                                     <span class="stop-actions">
                                         <button type="button" class="edit-stop" data-address="{{ $stop->address }}" data-action="{{ route('route-plans.stops.update', [$plan, $stop]) }}">Επεξεργασία</button>
                                         <button type="button" class="delete-stop" data-action="{{ route('route-plans.stops.destroy', [$plan, $stop]) }}">Διαγραφή</button>
+                                        <a
+                                            href="{{ $stopGoogleMapsUrl }}"
+                                            target="_blank"
+                                            rel="noopener"
+                                            class="share-stop"
+                                            aria-label="Άνοιγμα της στάσης {{ $stop->optimized_order }} στο Google Maps"
+                                        >Κοινοποίηση</a>
                                     </span>
                                 </div>
 
@@ -271,6 +288,16 @@
                             <button class="button">Αποθήκευση</button>
                         </div>
                     </form>
+                </dialog>
+
+                <dialog id="export-addresses-dialog" class="stop-dialog import-dialog export-dialog">
+                    <h2>Εξαγωγή διευθύνσεων</h2>
+                    <label for="export-addresses">Οι στάσεις με τη σειρά της διαδρομής</label>
+                    <textarea id="export-addresses" readonly>{{ $visits->pluck('address')->implode("\n") }}</textarea>
+                    <div class="dialog-actions">
+                        <button type="button" class="dialog-cancel">Κλείσιμο</button>
+                        <button type="button" class="button" id="copy-export-addresses">Αντιγραφή</button>
+                    </div>
                 </dialog>
 
                 <form method="post" id="delete-stop-form" hidden>
@@ -403,6 +430,9 @@
             const editStopForm = document.querySelector('#edit-stop-form');
             const editStopAddress = document.querySelector('#edit-stop-address');
             const deleteStopForm = document.querySelector('#delete-stop-form');
+            const exportAddressesDialog = document.querySelector('#export-addresses-dialog');
+            const exportAddresses = document.querySelector('#export-addresses');
+            const copyExportAddressesButton = document.querySelector('#copy-export-addresses');
             let draggedStop = null;
             let orderBeforeDragging = null;
             let orderSubmissionStarted = false;
@@ -430,6 +460,20 @@
                 button.textContent = 'Αντιγράφηκε!';
                 setTimeout(() => button.textContent = originalLabel, 1800);
             }));
+
+            document.querySelector('#open-export-addresses').addEventListener('click', () => {
+                exportAddressesDialog.showModal();
+                exportAddresses.focus();
+                exportAddresses.select();
+            });
+
+            exportAddressesDialog.querySelector('.dialog-cancel').addEventListener('click', () => exportAddressesDialog.close());
+
+            copyExportAddressesButton.addEventListener('click', async () => {
+                await navigator.clipboard.writeText(exportAddresses.value);
+                copyExportAddressesButton.textContent = 'Αντιγράφηκαν!';
+                setTimeout(() => copyExportAddressesButton.textContent = 'Αντιγραφή', 1800);
+            });
 
             document.querySelector('#open-add-stop').addEventListener('click', () => {
                 addStopDialog.showModal();

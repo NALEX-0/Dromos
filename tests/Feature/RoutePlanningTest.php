@@ -66,7 +66,15 @@ class RoutePlanningTest extends TestCase
             ->assertSee('Σύρετε για αλλαγή σειράς')
             ->assertSee('submitUpdatedOrder')
             ->assertSee('Άνοιγμα στο Google Maps')
-            ->assertSee('Αντιγραφή συνδέσμου');
+            ->assertSee('Αντιγραφή συνδέσμου')
+            ->assertSee('Κοινοποίηση')
+            ->assertSee('https://www.google.com/maps/search/?api=1', false)
+            ->assertSee('query=Acropolis%20Museum%2C%20117%2042%2C%20Athens', false)
+            ->assertSee('class="share-stop"', false)
+            ->assertSee('Εξαγωγή διευθύνσεων')
+            ->assertSee('id="export-addresses"', false)
+            ->assertSee("Monastiraki Square, 105 55, Athens\nAcropolis Museum, 117 42, Athens", false)
+            ->assertSee('copyExportAddressesButton', false);
 
         $plan->update(['total_duration_seconds' => 3900]);
         $this->get(route('route-plans.show', $plan))->assertOk()->assertSee('1 ώρα 5 λεπτά');
