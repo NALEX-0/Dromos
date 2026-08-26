@@ -21,7 +21,9 @@
     <main class="shell">
         <nav class="nav" aria-label="Κύρια πλοήγηση">
             <a class="brand" href="{{ auth()->check() ? route('route-plans.create') : route('login') }}">
-                <span class="brand-mark">↗</span>
+                <span class="brand-mark" aria-hidden="true">
+                    <x-icons.car />
+                </span>
                 Dromos
             </a>
 

@@ -321,7 +321,9 @@
             <div id="map" class="map">
                 <div class="map-fallback">
                     <div>
-                        <span class="map-logo">↗</span>
+                        <span class="map-logo" aria-hidden="true">
+                            <x-icons.car :size="24" />
+                        </span>
                         <b>{{ $plan ? 'Χάρτης διαδρομής' : 'Η διαδρομή σας θα εμφανιστεί εδώ' }}</b>
                         <span>
                             {{ $plan
