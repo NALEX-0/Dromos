@@ -42,6 +42,11 @@ final readonly class CachedGeocoder implements Geocoder
             $cached = GeocodedAddressCache::query()
                 ->where('normalized_address', $normalizedAddress)
                 ->firstOrFail();
+
+            if ($cached) {
+                $cached->increment('hit_count');
+                $cached->update(['last_used_at' => now()]);
+            }
         }
 
         return $this->toData($cached);
