@@ -5,10 +5,18 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class RoutePlan extends Model
 {
-    protected $fillable = ['user_id', 'name', 'status', 'route_mode', 'provider', 'avoid_tolls', 'return_to_start', 'total_distance_meters', 'total_duration_seconds', 'encoded_polyline', 'encoded_polylines', 'provider_payload'];
+    protected $fillable = ['user_id', 'share_token', 'name', 'status', 'route_mode', 'provider', 'avoid_tolls', 'return_to_start', 'total_distance_meters', 'total_duration_seconds', 'encoded_polyline', 'encoded_polylines', 'provider_payload'];
+
+    protected static function booted(): void
+    {
+        static::creating(function (RoutePlan $routePlan) {
+            $routePlan->share_token ??= Str::random(48);
+        });
+    }
 
     protected function casts(): array
     {
@@ -28,5 +36,14 @@ class RoutePlan extends Model
     public function orderedStops(): HasMany
     {
         return $this->stops()->orderBy('optimized_order');
+    }
+
+    public function ensureShareToken(): string
+    {
+        if (! $this->share_token) {
+            $this->forceFill(['share_token' => Str::random(48)])->save();
+        }
+
+        return $this->share_token;
     }
 }

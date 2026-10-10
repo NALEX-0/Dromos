@@ -182,8 +182,8 @@
                             </button>
                         @endforeach
                     </div>
-                    <button type="button" id="open-export-addresses" class="export-addresses-button">
-                        Εξαγωγή διευθύνσεων
+                    <button type="button" id="share-dromos-route" data-url="{{ $shareUrl }}">
+                        Κοινοποίηση διαδρομής Dromos
                     </button>
                 </div>
 
@@ -230,7 +230,7 @@
                                             rel="noopener"
                                             class="share-stop"
                                             aria-label="Άνοιγμα της στάσης {{ $stop->optimized_order }} στο Google Maps"
-                                        >Κοινοποίηση</a>
+                                        >Άνοιγμα</a>
                                     </span>
                                 </div>
 
@@ -288,16 +288,6 @@
                             <button class="button">Αποθήκευση</button>
                         </div>
                     </form>
-                </dialog>
-
-                <dialog id="export-addresses-dialog" class="stop-dialog import-dialog export-dialog">
-                    <h2>Εξαγωγή διευθύνσεων</h2>
-                    <label for="export-addresses">Οι στάσεις με τη σειρά της διαδρομής</label>
-                    <textarea id="export-addresses" readonly>{{ $visits->pluck('address')->implode("\n") }}</textarea>
-                    <div class="dialog-actions">
-                        <button type="button" class="dialog-cancel">Κλείσιμο</button>
-                        <button type="button" class="button" id="copy-export-addresses">Αντιγραφή</button>
-                    </div>
                 </dialog>
 
                 <form method="post" id="delete-stop-form" hidden>
@@ -432,9 +422,6 @@
             const editStopForm = document.querySelector('#edit-stop-form');
             const editStopAddress = document.querySelector('#edit-stop-address');
             const deleteStopForm = document.querySelector('#delete-stop-form');
-            const exportAddressesDialog = document.querySelector('#export-addresses-dialog');
-            const exportAddresses = document.querySelector('#export-addresses');
-            const copyExportAddressesButton = document.querySelector('#copy-export-addresses');
             let draggedStop = null;
             let orderBeforeDragging = null;
             let orderSubmissionStarted = false;
@@ -463,18 +450,29 @@
                 setTimeout(() => button.textContent = originalLabel, 1800);
             }));
 
-            document.querySelector('#open-export-addresses').addEventListener('click', () => {
-                exportAddressesDialog.showModal();
-                exportAddresses.focus();
-                exportAddresses.select();
-            });
+            document.querySelector('#share-dromos-route').addEventListener('click', async (event) => {
+                const button = event.currentTarget;
+                const originalLabel = button.textContent;
 
-            exportAddressesDialog.querySelector('.dialog-cancel').addEventListener('click', () => exportAddressesDialog.close());
+                if (navigator.share) {
+                    try {
+                        await navigator.share({
+                            title: 'Διαδρομή Dromos',
+                            text: 'Δείτε την υπολογισμένη διαδρομή στο Dromos.',
+                            url: button.dataset.url,
+                        });
 
-            copyExportAddressesButton.addEventListener('click', async () => {
-                await navigator.clipboard.writeText(exportAddresses.value);
-                copyExportAddressesButton.textContent = 'Αντιγράφηκαν!';
-                setTimeout(() => copyExportAddressesButton.textContent = 'Αντιγραφή', 1800);
+                        return;
+                    } catch (error) {
+                        if (error.name === 'AbortError') {
+                            return;
+                        }
+                    }
+                }
+
+                await navigator.clipboard.writeText(button.dataset.url);
+                button.textContent = 'Ο σύνδεσμος αντιγράφηκε!';
+                setTimeout(() => button.textContent = originalLabel, 1800);
             });
 
             document.querySelector('#open-add-stop').addEventListener('click', () => {
@@ -614,6 +612,11 @@
                 'lng' => $stop->longitude,
                 'label' => $stop->optimized_order === 0 ? 'S' : (string) $stop->optimized_order,
                 'isStart' => $stop->type === 'start',
+                'address' => $stop->formatted_address ?: $stop->address,
+                'googleMapsUrl' => 'https://www.google.com/maps/search/?'.http_build_query([
+                    'api' => 1,
+                    'query' => $stop->formatted_address ?: $stop->address,
+                ]),
             ]);
         @endphp
 
@@ -648,6 +651,11 @@
                         position: stop,
                         label: { text: stop.label, color: 'white', fontWeight: '700' },
                         icon: markerIcon(false, stop.isStart),
+                        title: stop.address,
+                    });
+
+                    marker.addListener('click', () => {
+                        window.open(stop.googleMapsUrl, '_blank', 'noopener,noreferrer');
                     });
 
                     markers.set(String(stop.id), marker);

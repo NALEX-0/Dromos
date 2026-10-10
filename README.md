@@ -7,7 +7,7 @@ Dromos is a Laravel web application for planning multi-stop driving routes in Gr
 - **Optimized route:** supports up to 25 destinations and asks Google Routes to reorder the stops primarily by driving time. It uses traffic-aware routing.
 - **Sequential route:** supports up to 100 destinations and preserves the user's exact order. Dromos divides large routes into overlapping requests with no more than 10 intermediate waypoints, avoiding waypoint optimization and live-traffic routing.
 
-Both modes support toll avoidance, return to start, bulk address import, drag-and-drop ordering, address addition/editing/deletion, automatic recalculation, multiple route polylines, and segmented Google Maps sharing links.
+Both modes support toll avoidance, return to start, bulk address import, drag-and-drop ordering, address addition/editing/deletion, automatic recalculation, multiple route polylines, segmented Google Maps links, and secure read-only Dromos sharing links for authenticated users.
 
 ## API usage and stored data
 

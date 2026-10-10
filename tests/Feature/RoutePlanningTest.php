@@ -54,6 +54,7 @@ class RoutePlanningTest extends TestCase
         $this->assertDatabaseCount('stops', 3);
         $this->assertDatabaseHas('stops', ['address' => 'Acropolis Museum, 117 42, Athens']);
         $this->assertSame('ready', $plan->status);
+        $this->assertNotNull($plan->share_token);
         $this->assertSame(auth()->id(), $plan->user_id);
         $this->assertTrue($plan->avoid_tolls);
         $this->assertTrue($plan->provider_payload['avoid_tolls']);
@@ -67,17 +68,43 @@ class RoutePlanningTest extends TestCase
             ->assertSee('submitUpdatedOrder')
             ->assertSee('Άνοιγμα στο Google Maps')
             ->assertSee('Αντιγραφή συνδέσμου')
+            ->assertSee('Κοινοποίηση διαδρομής Dromos')
+            ->assertSee(route('route-plans.shared', $plan->share_token), false)
             ->assertSee('Κοινοποίηση')
             ->assertSee('https://www.google.com/maps/search/?api=1', false)
             ->assertSee('query=Acropolis%20Museum%2C%20117%2042%2C%20Athens', false)
             ->assertSee('class="share-stop"', false)
-            ->assertSee('Εξαγωγή διευθύνσεων')
-            ->assertSee('id="export-addresses"', false)
-            ->assertSee("Monastiraki Square, 105 55, Athens\nAcropolis Museum, 117 42, Athens", false)
-            ->assertSee('copyExportAddressesButton', false);
+            ->assertDontSee('Εξαγωγή διευθύνσεων')
+            ->assertDontSee('id="export-addresses"', false);
 
         $plan->update(['total_duration_seconds' => 3900]);
         $this->get(route('route-plans.show', $plan))->assertOk()->assertSee('1 ώρα 5 λεπτά');
+    }
+
+    public function test_a_shared_route_requires_login_and_is_read_only(): void
+    {
+        $plan = $this->createRouteWithTwoDestinations()->fresh();
+        $shareUrl = route('route-plans.shared', $plan->share_token);
+
+        auth()->logout();
+
+        $this->get($shareUrl)->assertRedirect(route('login'));
+
+        $this->actingAs(User::factory()->create());
+
+        $this->get($shareUrl)
+            ->assertOk()
+            ->assertSee('Κοινόχρηστη διαδρομή')
+            ->assertSee('Μόνο για προβολή')
+            ->assertSee('Syntagma, Athens')
+            ->assertSee('Acropolis, Athens')
+            ->assertSee('Monastiraki, Athens')
+            ->assertSee('Άνοιγμα στο Google Maps')
+            ->assertDontSee('Επεξεργασία')
+            ->assertDontSee('Διαγραφή')
+            ->assertDontSee('Επαναϋπολογισμός διαδρομής');
+
+        $this->get(route('route-plans.shared', 'invalid-token'))->assertNotFound();
     }
 
     public function test_stops_can_be_manually_forced_into_an_exact_order(): void
@@ -261,13 +288,16 @@ class RoutePlanningTest extends TestCase
 
         $response->assertRedirect(route('route-plans.show', $plan));
         $this->assertSame('ordered', $plan->route_mode);
+        $this->assertNotNull($plan->share_token);
         $this->assertSame(35, $plan->stops()->where('type', 'visit')->count());
         $this->assertSame(
             ['Ordered Stop 1, Athens', 'Ordered Stop 2, Athens', 'Ordered Stop 3, Athens'],
             $plan->stops()->where('type', 'visit')->orderBy('optimized_order')->limit(3)->pluck('address')->all(),
         );
         $this->assertCount(4, $plan->provider_payload['segments']);
-        $this->get(route('route-plans.show', $plan))->assertSee('χωρίς βελτιστοποίηση σειράς');
+        $this->get(route('route-plans.show', $plan))
+            ->assertSee('χωρίς βελτιστοποίηση σειράς')
+            ->assertSee('Κοινοποίηση διαδρομής Dromos');
     }
 
     public function test_ordered_planner_rejects_more_than_one_hundred_stops(): void

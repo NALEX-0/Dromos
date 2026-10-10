@@ -57,9 +57,31 @@ class RoutePlanController extends Controller
     public function show(RoutePlan $routePlan, GoogleMapsRouteUrlBuilder $urlBuilder)
     {
         $this->authorize('view', $routePlan);
+        $routePlan->ensureShareToken();
         $routePlan->load(['stops' => fn ($q) => $q->orderBy('optimized_order')]);
 
-        return view('route-plans.workspace', ['plan' => $routePlan, 'browserKey' => config('services.google.browser_key'), 'googleMapsLinks' => $urlBuilder->build($routePlan)]);
+        return view('route-plans.workspace', [
+            'plan' => $routePlan,
+            'browserKey' => config('services.google.browser_key'),
+            'googleMapsLinks' => $urlBuilder->build($routePlan),
+            'shareUrl' => route('route-plans.shared', $routePlan->share_token),
+        ]);
+    }
+
+    public function shared(string $shareToken, GoogleMapsRouteUrlBuilder $urlBuilder)
+    {
+        $routePlan = RoutePlan::query()
+            ->where('share_token', $shareToken)
+            ->where('status', 'ready')
+            ->firstOrFail();
+        $routePlan->load(['stops' => fn ($query) => $query->orderBy('optimized_order')]);
+
+        return view('route-plans.shared', [
+            'plan' => $routePlan,
+            'browserKey' => config('services.google.browser_key'),
+            'googleMapsLinks' => $urlBuilder->build($routePlan),
+            'shareUrl' => route('route-plans.shared', $routePlan->share_token),
+        ]);
     }
 
     public function reorder(Request $request, RoutePlan $routePlan, ReorderRoutePlan $action)

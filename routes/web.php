@@ -12,6 +12,7 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
+    Route::get('/shared/routes/{shareToken}', [RoutePlanController::class, 'shared'])->name('route-plans.shared');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/', [RoutePlanController::class, 'create'])->name('route-plans.create');
     Route::post('/routes', [RoutePlanController::class, 'store'])->name('route-plans.store');
