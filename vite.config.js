@@ -9,7 +9,6 @@ export default defineConfig({
             input: [
                 'resources/css/app.css',
                 'resources/css/workspace.css',
-                'resources/css/shared-route.css',
                 'resources/js/app.js',
             ],
             refresh: true,

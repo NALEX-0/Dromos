@@ -15,6 +15,70 @@
 
 .add-route-stop{width:100%;justify-content:center;margin:14px 0}
 
+/* Shared, read-only route */
+.shared-route .workspace-heading {
+    align-items: center;
+}
+
+.shared-route-note {
+    margin: -8px 0 16px;
+    padding: 9px 12px;
+    border-radius: 9px;
+    background: #e8f2e2;
+    color: var(--forest);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.shared-route .fixed-origin {
+    grid-template-columns: 35px minmax(0, 1fr) auto;
+}
+
+.shared-route .fixed-origin > div,
+.shared-route .stop-copy {
+    min-width: 0;
+}
+
+.shared-route .shared-ordered-stop {
+    grid-template-columns: 31px minmax(0, 1fr);
+    gap: 12px;
+}
+
+.shared-route .share-stop {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    margin-top: 7px;
+    padding: 5px 9px;
+    border-radius: 7px;
+    background: #edf3e9;
+    color: var(--forest);
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.2;
+    text-decoration: none;
+}
+
+@media (max-width: 520px) {
+    .shared-route .stop-copy strong,
+    .shared-route .stop-copy small,
+    .shared-route .fixed-origin strong {
+        white-space: normal;
+        overflow: visible;
+        overflow-wrap: anywhere;
+        text-overflow: clip;
+    }
+
+    .shared-route .stop-copy strong {
+        line-height: 1.35;
+    }
+
+    .shared-route .stop-copy small {
+        margin-top: 2px;
+        line-height: 1.35;
+    }
+}
+
 .import-addresses-button{margin-bottom:22px}.import-dialog textarea{display:block;width:100%;min-height:230px;resize:vertical;border:1px solid var(--line);border-radius:10px;padding:12px;font:inherit;font-size:14px;line-height:1.5}.import-dialog textarea:focus{border-color:var(--forest);outline:3px solid rgba(31,92,67,.12)}.import-help{margin:9px 0 0;color:var(--muted);font-size:11px;line-height:1.45}.import-error{margin:9px 0 0;color:#a5483d;font-size:12px;font-weight:700}
 
 .share-route{display:grid;gap:7px;margin:0 0 14px}.share-route-links,.copy-route-links{display:grid;grid-template-columns:repeat(var(--segment-count),minmax(0,1fr));gap:7px}.google-maps-link,.share-route button{display:flex;align-items:center;justify-content:center;min-height:36px;border:1px solid rgba(31,92,67,.2);border-radius:9px;background:#edf3e9;color:var(--forest);padding:8px 8px;font-size:10px;font-weight:700;text-align:center;text-decoration:none;cursor:pointer}.share-route button{width:100%;background:white}.share-route .export-addresses-button{background:#edf3e9}.export-dialog textarea{white-space:pre-wrap}@media(max-width:520px){.share-route-links,.copy-route-links{grid-template-columns:1fr}}
