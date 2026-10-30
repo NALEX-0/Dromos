@@ -194,7 +194,22 @@ class RoutePlanningTest extends TestCase
         $this->assertCount(2, $links);
         $this->assertTrue($plan->return_to_start);
         $this->assertStringContainsString('avoid=tolls', $links[0]);
-        $this->assertStringContainsString(urlencode((string) $plan->stops->firstWhere('type', 'start')->latitude), $links[1]);
+        $this->assertStringNotContainsString('dir_action=navigate', $links[0]);
+
+        parse_str(parse_url($links[0], PHP_URL_QUERY), $firstLinkParameters);
+
+        $start = $plan->stops->firstWhere('type', 'start');
+        $this->assertSame($start->formatted_address, $firstLinkParameters['origin']);
+        $this->assertSame($start->place_id, $firstLinkParameters['origin_place_id']);
+        $this->assertArrayHasKey('waypoint_place_ids', $firstLinkParameters);
+
+        foreach ($links as $link) {
+            parse_str(parse_url($link, PHP_URL_QUERY), $parameters);
+
+            $this->assertDoesNotMatchRegularExpression('/^-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?$/', $parameters['origin']);
+            $this->assertDoesNotMatchRegularExpression('/^-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?$/', $parameters['destination']);
+        }
+
         $this->get(route('route-plans.show', $plan))
             ->assertSee('Αντιγραφή τμήματος 1')
             ->assertSee('Αντιγραφή τμήματος 2');

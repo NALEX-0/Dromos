@@ -35,17 +35,34 @@ final class GoogleMapsRouteUrlBuilder
     /** @param array<int, Stop> $points */
     private function buildSegment(array $points, bool $avoidTolls): string
     {
+        $origin = $points[0];
+        $destination = $points[array_key_last($points)];
         $parameters = [
             'api' => 1,
-            'origin' => $this->coordinates($points[0]),
-            'destination' => $this->coordinates($points[array_key_last($points)]),
+            'origin' => $this->address($origin),
+            'destination' => $this->address($destination),
             'travelmode' => 'driving',
-            'dir_action' => 'navigate',
         ];
+
+        if ($origin->place_id) {
+            $parameters['origin_place_id'] = $origin->place_id;
+        }
+
+        if ($destination->place_id) {
+            $parameters['destination_place_id'] = $destination->place_id;
+        }
+
         $waypoints = array_slice($points, 1, -1);
 
         if ($waypoints !== []) {
-            $parameters['waypoints'] = implode('|', array_map($this->coordinates(...), $waypoints));
+            $parameters['waypoints'] = implode('|', array_map($this->address(...), $waypoints));
+
+            if (collect($waypoints)->every(fn (Stop $stop) => filled($stop->place_id))) {
+                $parameters['waypoint_place_ids'] = implode('|', array_map(
+                    fn (Stop $stop) => $stop->place_id,
+                    $waypoints,
+                ));
+            }
         }
 
         if ($avoidTolls) {
@@ -55,8 +72,8 @@ final class GoogleMapsRouteUrlBuilder
         return 'https://www.google.com/maps/dir/?'.http_build_query($parameters, '', '&', PHP_QUERY_RFC3986);
     }
 
-    private function coordinates(Stop $stop): string
+    private function address(Stop $stop): string
     {
-        return "{$stop->latitude},{$stop->longitude}";
+        return $stop->formatted_address ?: $stop->fullAddress();
     }
 }
