@@ -135,6 +135,110 @@ body {
   padding: 20px 24px;
 }
 
+.app-layout {
+  display: grid;
+  grid-template-columns: 224px minmax(0, 1fr);
+  min-height: 100dvh;
+}
+
+.app-sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  padding: 24px 18px;
+  border-right: 1px solid rgba(31, 92, 67, .12);
+  background: #f0efe6;
+}
+
+.app-sidebar .brand {
+  margin: 0 8px 34px;
+}
+
+.app-navigation {
+  display: grid;
+  gap: 6px;
+}
+
+.app-navigation-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.app-navigation-link > span {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  color: var(--forest);
+  font-size: 18px;
+}
+
+.app-navigation-link:hover {
+  background: rgba(255, 255, 255, .55);
+  color: var(--forest);
+}
+
+.app-navigation-link.is-active {
+  background: var(--forest);
+  color: white;
+  box-shadow: 0 5px 16px rgba(31, 92, 67, .16);
+}
+
+.app-navigation-link.is-active > span {
+  color: var(--lime);
+}
+
+.sidebar-account {
+  margin-top: auto;
+  padding: 14px 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.sidebar-account strong,
+.sidebar-account small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-account strong {
+  font-size: 12px;
+}
+
+.sidebar-account small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.sidebar-account form {
+  margin-top: 10px;
+}
+
+.sidebar-account button {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  padding: 0;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.app-content {
+  min-width: 0;
+  padding: 20px 24px;
+}
+
 .nav {
   justify-content: space-between;
   align-items: center;
@@ -482,6 +586,67 @@ input:focus {
 }
 
 @media (width <= 900px) {
+  .app-layout {
+    display: block;
+  }
+
+  .app-sidebar {
+    position: sticky;
+    z-index: 20;
+    height: auto;
+    padding: 10px 14px;
+    border-right: 0;
+    border-bottom: 1px solid rgba(31, 92, 67, .12);
+  }
+
+  .app-sidebar .brand {
+    margin: 0 0 9px;
+    font-size: 20px;
+  }
+
+  .app-sidebar .brand-mark {
+    width: 30px;
+    height: 30px;
+  }
+
+  .app-navigation {
+    display: flex;
+    gap: 5px;
+    overflow-x: auto;
+  }
+
+  .app-navigation-link {
+    flex: 0 0 auto;
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+
+  .app-navigation-link > span {
+    width: auto;
+    font-size: 15px;
+  }
+
+  .sidebar-account {
+    position: absolute;
+    top: 13px;
+    right: 14px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .sidebar-account > div {
+    display: none;
+  }
+
+  .sidebar-account form {
+    margin: 0;
+  }
+
+  .app-content {
+    padding: 14px;
+  }
+
   .hero, .result-grid {
     grid-template-columns: 1fr;
   }

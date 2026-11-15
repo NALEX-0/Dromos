@@ -19,6 +19,32 @@ use Throwable;
 
 class RoutePlanController extends Controller
 {
+    public function index(Request $request)
+    {
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:120'],
+            'mode' => ['nullable', 'in:optimized,ordered'],
+        ]);
+
+        $routes = RoutePlan::query()
+            ->where('user_id', $request->user()->id)
+            ->with(['stops' => fn ($query) => $query->where('type', 'start')])
+            ->withCount(['stops as stops_count' => fn ($query) => $query->where('type', 'visit')])
+            ->when($filters['q'] ?? null, function ($query, $search) {
+                $query->where(function ($query) use ($search) {
+                    $query
+                        ->where('name', 'like', "%{$search}%")
+                        ->orWhereHas('stops', fn ($stops) => $stops->where('address', 'like', "%{$search}%"));
+                });
+            })
+            ->when($filters['mode'] ?? null, fn ($query, $mode) => $query->where('route_mode', $mode))
+            ->latest('updated_at')
+            ->paginate(12)
+            ->withQueryString();
+
+        return view('route-plans.index', compact('routes'));
+    }
+
     public function create()
     {
         return view('route-plans.workspace', ['plan' => null, 'browserKey' => config('services.google.browser_key'), 'plannerMode' => 'optimized', 'maximumStops' => 25]);
@@ -27,6 +53,13 @@ class RoutePlanController extends Controller
     public function createOrdered()
     {
         return view('route-plans.workspace', ['plan' => null, 'browserKey' => config('services.google.browser_key'), 'plannerMode' => 'ordered', 'maximumStops' => 100]);
+    }
+
+    public function mapStyleDemo()
+    {
+        return view('map-style-demo', [
+            'browserKey' => config('services.google.browser_key'),
+        ]);
     }
 
     public function store(StoreRoutePlanRequest $request, CreateOptimizedRoutePlan $action)
@@ -116,6 +149,23 @@ class RoutePlanController extends Controller
         return redirect()
             ->route('route-plans.show', $routePlan)
             ->with('status', 'Οι επιλογές διαδρομής ενημερώθηκαν.');
+    }
+
+    public function update(Request $request, RoutePlan $routePlan)
+    {
+        $this->authorize('update', $routePlan);
+        $data = $request->validate(['name' => ['required', 'string', 'max:120']]);
+        $routePlan->update($data);
+
+        return back()->with('status', 'Το όνομα της διαδρομής ενημερώθηκε.');
+    }
+
+    public function destroy(RoutePlan $routePlan)
+    {
+        $this->authorize('delete', $routePlan);
+        $routePlan->delete();
+
+        return redirect()->route('route-plans.index')->with('status', 'Η διαδρομή διαγράφηκε.');
     }
 
     public function storeStop(Request $request, RoutePlan $routePlan, AddRouteStop $action)

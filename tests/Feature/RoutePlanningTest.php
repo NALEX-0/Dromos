@@ -28,6 +28,7 @@ class RoutePlanningTest extends TestCase
         $this->get('/')
             ->assertOk()
             ->assertSee('Dromos')
+            ->assertSee('Οι διαδρομές μου')
             ->assertSee('Βελτιστοποίηση διαδρομής')
             ->assertSee('aria-current="page"', false)
             ->assertSee('Θράκης 11, 13671, Αχαρνές')
@@ -35,6 +36,66 @@ class RoutePlanningTest extends TestCase
             ->assertSee('id="import-addresses"', false)
             ->assertDontSee('name="start[postal_code]"', false)
             ->assertDontSee('name="start[city]"', false);
+    }
+
+    public function test_map_style_demo_page_is_available(): void
+    {
+        config([
+            'services.google.browser_key' => 'test-browser-key',
+        ]);
+
+        $this->get(route('map-style-demo'))
+            ->assertOk()
+            ->assertSee('Χρωματισμός περιοχών')
+            ->assertSee('id="area-search-form"', false)
+            ->assertSee('id="colored-areas-list"', false)
+            ->assertSee('id="map-style-map"', false)
+            ->assertSee('new google.maps.Polygon', false)
+            ->assertSee('addColoredArea', false)
+            ->assertSee('nominatim.openstreetmap.org/search', false)
+            ->assertSee('OpenStreetMap contributors')
+            ->assertSee('app-navigation-link is-active', false);
+    }
+
+    public function test_route_history_lists_only_the_authenticated_users_routes(): void
+    {
+        $plan = $this->createRouteWithTwoDestinations();
+        $plan->update(['name' => 'Πρωινές παραδόσεις']);
+        $otherUser = User::factory()->create();
+        RoutePlan::create([
+            'user_id' => $otherUser->id,
+            'name' => 'Ξένη διαδρομή',
+            'status' => 'ready',
+        ]);
+
+        $this->get(route('route-plans.index'))
+            ->assertOk()
+            ->assertSee('Οι διαδρομές μου')
+            ->assertSee('Πρωινές παραδόσεις')
+            ->assertSee('Syntagma, Athens')
+            ->assertDontSee('Ξένη διαδρομή');
+    }
+
+    public function test_a_route_can_be_renamed_from_its_workspace(): void
+    {
+        $plan = $this->createRouteWithTwoDestinations();
+
+        $this->patch(route('route-plans.update', $plan), [
+            'name' => 'Παραδόσεις Πειραιά',
+        ])->assertRedirect();
+
+        $this->assertSame('Παραδόσεις Πειραιά', $plan->fresh()->name);
+    }
+
+    public function test_a_route_can_be_deleted_from_history(): void
+    {
+        $plan = $this->createRouteWithTwoDestinations();
+
+        $this->delete(route('route-plans.destroy', $plan))
+            ->assertRedirect(route('route-plans.index'));
+
+        $this->assertDatabaseMissing('route_plans', ['id' => $plan->id]);
+        $this->assertDatabaseMissing('stops', ['route_plan_id' => $plan->id]);
     }
 
     public function test_a_route_can_be_geocoded_optimized_and_saved(): void
@@ -63,7 +124,7 @@ class RoutePlanningTest extends TestCase
 
         $this->get(route('route-plans.show', $plan))
             ->assertOk()
-            ->assertSee('Διαδρομές')
+            ->assertSee('Όνομα διαδρομής')
             ->assertSee('Αποφυγή διοδίων')
             ->assertSee('id="route-options-form"', false)
             ->assertSeeInOrder([
@@ -346,7 +407,7 @@ class RoutePlanningTest extends TestCase
             ->assertOk()
             ->assertSee('Σειριακή διαδρομή')
             ->assertSee('Έως 100 στάσεις')
-            ->assertSee('planner-link is-active', false);
+            ->assertSee('app-navigation-link is-active', false);
 
         $stops = collect(range(1, 35))
             ->map(fn ($number) => ['address' => "Ordered Stop {$number}, Athens"])

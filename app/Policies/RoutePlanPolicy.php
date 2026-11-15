@@ -16,4 +16,9 @@ class RoutePlanPolicy
     {
         return $routePlan->user_id === $user->id;
     }
+
+    public function delete(User $user, RoutePlan $routePlan): bool
+    {
+        return $routePlan->user_id === $user->id;
+    }
 }

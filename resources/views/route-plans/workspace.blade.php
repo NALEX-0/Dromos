@@ -19,9 +19,14 @@
             @endif
 
             @if (! $plan)
+                <div class="planner-mode-tabs" aria-label="Τύπος διαδρομής">
+                    <a href="{{ route('route-plans.create') }}" class="{{ ! $isOrderedPlanner ? 'is-active' : '' }}">Βελτιστοποιημένη</a>
+                    <a href="{{ route('ordered-route-plans.create') }}" class="{{ $isOrderedPlanner ? 'is-active' : '' }}">Σειριακή</a>
+                </div>
+
                 <div class="workspace-heading">
                     <div>
-                        <span class="eyebrow">{{ $isOrderedPlanner ? 'Έως 100 στάσεις' : 'Νέα διαδρομή' }}</span>
+                        <span class="eyebrow">{{ $isOrderedPlanner ? 'Νέα διαδρομή' : 'Νέα διαδρομή' }}</span>
                         <h1>{{ $isOrderedPlanner ? 'Σειριακή διαδρομή' : 'Σχεδιασμός διαδρομής' }}</h1>
                         <p>{{ $isOrderedPlanner ? 'Η σειρά που εισάγετε διατηρείται, χωρίς αυτόματη βελτιστοποίηση.' : 'Προσθέστε όλες τις στάσεις και θα βρούμε την ταχύτερη σειρά.' }}</p>
                     </div>
@@ -34,6 +39,16 @@
                         Εισαγωγή διευθύνσεων
                         <span>⇧</span>
                     </button>
+
+                    <label class="section-label" for="route-name">Όνομα διαδρομής</label>
+                    <input
+                        id="route-name"
+                        class="route-name-input"
+                        name="name"
+                        value="{{ old('name') }}"
+                        placeholder="Διαδρομή 1"
+                        maxlength="120"
+                    >
 
                     <label class="section-label">Σημείο εκκίνησης</label>
 
@@ -133,13 +148,20 @@
                 @endphp
 
                 <div class="workspace-heading">
-                    <div>
-                        <!-- <span class="eyebrow">Optimized route</span> -->
-                        <h1>Διαδρομές</h1>
-                        <!-- <p>Move stops or choose an exact position, then recalculate.</p> -->
-                    </div>
+                    <form method="post" action="{{ route('route-plans.update', $plan) }}" class="route-title-form">
+                        @csrf
+                        @method('PATCH')
+                        <label for="route-plan-name">Όνομα διαδρομής</label>
+                        <div>
+                            <input id="route-plan-name" name="name" value="{{ $plan->name }}" required maxlength="120">
+                            <button type="submit">Αποθήκευση</button>
+                        </div>
+                        <small>
+                            {{ $plan->route_mode === 'ordered' ? 'Σειριακή' : 'Βελτιστοποιημένη' }} ·
+                            Ενημερώθηκε {{ $plan->updated_at->format('d/m/Y H:i') }}
+                        </small>
+                    </form>
 
-                    <a href="{{ $plan->route_mode === 'ordered' ? route('ordered-route-plans.create') : route('route-plans.create') }}" class="icon-link" title="Νέα διαδρομή">＋</a>
                 </div>
 
                 <div class="mini-summary">
@@ -174,7 +196,7 @@
                     <div class="copy-route-links" style="--segment-count: {{ min(count($googleMapsLinks), 3) }}">
                         @foreach ($googleMapsLinks as $googleMapsLink)
                             <button type="button" class="copy-google-link" data-link="{{ $googleMapsLink }}">
-                                {{ count($googleMapsLinks) === 1 ? 'Αντιγραφή συνδέσμου' : 'Αντιγραφή τμήματος '.$loop->iteration }}
+                                {{ count($googleMapsLinks) === 1 ? 'Αντιγραφή συνδέσμου Google Maps' : 'Αντιγραφή Google Maps '.$loop->iteration }}
                             </button>
                         @endforeach
                     </div>
