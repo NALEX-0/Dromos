@@ -58,6 +58,9 @@ class RoutePlanningTest extends TestCase
         $this->assertSame(auth()->id(), $plan->user_id);
         $this->assertTrue($plan->avoid_tolls);
         $this->assertTrue($plan->provider_payload['avoid_tolls']);
+
+        config(['services.google.browser_key' => 'test-browser-key']);
+
         $this->get(route('route-plans.show', $plan))
             ->assertOk()
             ->assertSee('Διαδρομές')
@@ -66,6 +69,8 @@ class RoutePlanningTest extends TestCase
             ->assertSee('data-stop-id=', false)
             ->assertSee('Σύρετε για αλλαγή σειράς')
             ->assertSee('submitUpdatedOrder')
+            ->assertSee('dromos.map-view.', false)
+            ->assertSee('persistDromosMapView', false)
             ->assertSee('Άνοιγμα στο Google Maps')
             ->assertSee('Αντιγραφή συνδέσμου')
             ->assertSee('Κοινοποίηση διαδρομής Dromos')

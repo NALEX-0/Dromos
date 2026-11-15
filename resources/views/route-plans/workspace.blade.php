@@ -440,6 +440,7 @@
                 orderSubmissionStarted = true;
                 saveOrderButton.disabled = true;
                 saveOrderButton.firstChild.textContent = 'Επαναϋπολογισμός... ';
+                window.persistDromosMapView?.();
                 orderForm.requestSubmit();
             }
 
@@ -626,6 +627,19 @@
             window.dromosPolylines = @json($plan->encoded_polylines ?: array_values(array_filter([$plan->encoded_polyline])));
 
             window.initDromosMap = () => {
+                const mapViewStorageKey = 'dromos.map-view.{{ $plan->id }}';
+
+                const savedMapView = (() => {
+                    try {
+                        const view = JSON.parse(sessionStorage.getItem(mapViewStorageKey));
+                        const values = [view?.center?.lat, view?.center?.lng, view?.zoom];
+
+                        return values.every(Number.isFinite) ? view : null;
+                    } catch {
+                        return null;
+                    }
+                })();
+
                 const markerIcon = (highlighted = false, isStart = false) => ({
                     path: google.maps.SymbolPath.CIRCLE,
                     scale: highlighted ? 23 : 18,
@@ -635,8 +649,8 @@
                     strokeWeight: highlighted ? 3 : 2,
                 });
                 const map = new google.maps.Map(document.querySelector('#map'), {
-                    center: { lat: 37.9838, lng: 23.7275 },
-                    zoom: 12,
+                    center: savedMapView?.center ?? { lat: 37.9838, lng: 23.7275 },
+                    zoom: savedMapView?.zoom ?? 12,
                     mapTypeControl: false,
                     streetViewControl: false,
                     fullscreenControl: false,
@@ -701,7 +715,31 @@
                     });
                 });
 
-                map.fitBounds(bounds, 60);
+                window.persistDromosMapView = () => {
+                    const center = map.getCenter();
+
+                    if (! center) {
+                        return;
+                    }
+
+                    try {
+                        sessionStorage.setItem(mapViewStorageKey, JSON.stringify({
+                            center: {
+                                lat: center.lat(),
+                                lng: center.lng(),
+                            },
+                            zoom: map.getZoom(),
+                        }));
+                    } catch {
+                        // The map continues to work when browser storage is unavailable.
+                    }
+                };
+
+                map.addListener('idle', window.persistDromosMapView);
+
+                if (! savedMapView) {
+                    map.fitBounds(bounds, 60);
+                }
             };
         </script>
 
