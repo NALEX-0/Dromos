@@ -129,15 +129,16 @@ body {
 }
 
 .shell {
-  max-width: 1320px;
+  width: 100%;
+  max-width: 1680px;
   margin: auto;
-  padding: 28px 34px;
+  padding: 20px 24px;
 }
 
 .nav {
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 60px;
+  margin-bottom: 24px;
   display: flex;
 }
 
