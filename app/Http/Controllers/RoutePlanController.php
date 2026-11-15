@@ -8,6 +8,7 @@ use App\Actions\CreateOrderedRoutePlan;
 use App\Actions\DeleteRouteStop;
 use App\Actions\ReorderRoutePlan;
 use App\Actions\UpdateRouteStop;
+use App\Actions\UpdateRouteOptions;
 use App\Http\Requests\StoreOrderedRoutePlanRequest;
 use App\Http\Requests\StoreRoutePlanRequest;
 use App\Models\RoutePlan;
@@ -97,6 +98,24 @@ class RoutePlanController extends Controller
         }
 
         return redirect()->route('route-plans.show', $routePlan)->with('status', 'Η διαδρομή ενημερώθηκε με τη σειρά που επιλέξατε.');
+    }
+
+    public function updateOptions(Request $request, RoutePlan $routePlan, UpdateRouteOptions $action)
+    {
+        $this->authorize('update', $routePlan);
+        $data = $request->validate(['avoid_tolls' => ['required', 'boolean']]);
+
+        try {
+            $action->execute($routePlan, (bool) $data['avoid_tolls']);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return back()->withErrors(['route' => $exception->getMessage()]);
+        }
+
+        return redirect()
+            ->route('route-plans.show', $routePlan)
+            ->with('status', 'Οι επιλογές διαδρομής ενημερώθηκαν.');
     }
 
     public function storeStop(Request $request, RoutePlan $routePlan, AddRouteStop $action)

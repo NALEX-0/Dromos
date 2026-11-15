@@ -64,7 +64,13 @@ class RoutePlanningTest extends TestCase
         $this->get(route('route-plans.show', $plan))
             ->assertOk()
             ->assertSee('Διαδρομές')
-            ->assertSee('Αποφυγή διοδίων ενεργή')
+            ->assertSee('Αποφυγή διοδίων')
+            ->assertSee('id="route-options-form"', false)
+            ->assertSeeInOrder([
+                '＋ Προσθήκη στάσης',
+                'id="route-options-form"',
+                'Επαναϋπολογισμός διαδρομής',
+            ], false)
             ->assertSee('draggable="true"', false)
             ->assertSee('data-stop-id=', false)
             ->assertSee('Σύρετε για αλλαγή σειράς')
@@ -255,6 +261,52 @@ class RoutePlanningTest extends TestCase
         ]);
 
         $this->assertFalse(RoutePlan::firstOrFail()->avoid_tolls);
+    }
+
+    public function test_toll_avoidance_can_be_changed_on_an_existing_route(): void
+    {
+        $plan = $this->createRouteWithTwoDestinations();
+
+        $this->patch(route('route-plans.options.update', $plan), [
+            'avoid_tolls' => true,
+        ])->assertRedirect(route('route-plans.show', $plan));
+
+        $plan->refresh();
+
+        $this->assertTrue($plan->avoid_tolls);
+        $this->assertTrue($plan->provider_payload['avoid_tolls']);
+        $this->get(route('route-plans.show', $plan))
+            ->assertOk()
+            ->assertSee('id="route-options-form"', false)
+            ->assertSee('name="avoid_tolls"', false)
+            ->assertSee('checked', false);
+    }
+
+    public function test_changing_toll_avoidance_preserves_sequential_mode(): void
+    {
+        $this->post(route('ordered-route-plans.store'), [
+            'start' => ['address' => 'Ordered Start, Athens'],
+            'stops' => [
+                ['address' => 'Ordered Stop 1, Athens'],
+                ['address' => 'Ordered Stop 2, Athens'],
+            ],
+        ]);
+        $plan = RoutePlan::firstOrFail();
+        $orderBeforeRecalculation = $plan->stops()
+            ->where('type', 'visit')
+            ->orderBy('optimized_order')
+            ->pluck('id')
+            ->all();
+
+        $this->patch(route('route-plans.options.update', $plan), [
+            'avoid_tolls' => true,
+        ])->assertRedirect(route('route-plans.show', $plan));
+
+        $this->assertSame('ordered', $plan->fresh()->route_mode);
+        $this->assertSame(
+            $orderBeforeRecalculation,
+            $plan->stops()->where('type', 'visit')->orderBy('optimized_order')->pluck('id')->all(),
+        );
     }
 
     public function test_at_least_two_destinations_are_required(): void

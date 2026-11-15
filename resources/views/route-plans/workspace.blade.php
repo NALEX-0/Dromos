@@ -159,10 +159,6 @@
                     </div>
                 </div>
 
-                @if ($plan->avoid_tolls)
-                    <div class="route-constraint">✓ Αποφυγή διοδίων ενεργή</div>
-                @endif
-
                 @if ($plan->route_mode === 'ordered')
                     <div class="route-constraint ordered-mode-badge">Σειριακή διαδρομή · χωρίς βελτιστοποίηση σειράς</div>
                 @endif
@@ -196,7 +192,7 @@
                     <span class="fixed-label">Σταθερό</span>
                 </div>
 
-                <form method="post" action="{{ route('route-plans.reorder', $plan) }}">
+                <form method="post" action="{{ route('route-plans.reorder', $plan) }}" id="route-order-form">
                     @csrf
                     @method('PATCH')
 
@@ -252,16 +248,36 @@
                             </article>
                         @endforeach
                     </div>
-
-                    <button type="button" class="add add-route-stop" id="open-add-stop">
-                        ＋ Προσθήκη στάσης
-                    </button>
-
-                    <button class="button button-wide save-order" disabled>
-                        Επαναϋπολογισμός διαδρομής
-                        <span>→</span>
-                    </button>
                 </form>
+
+                <button type="button" class="add add-route-stop" id="open-add-stop">
+                    ＋ Προσθήκη στάσης
+                </button>
+
+                <form
+                    method="post"
+                    action="{{ route('route-plans.options.update', $plan) }}"
+                    id="route-options-form"
+                >
+                    @csrf
+                    @method('PATCH')
+                    <input type="hidden" name="avoid_tolls" value="0">
+                    <label class="route-switch">
+                        <span>Αποφυγή διοδίων</span>
+                        <input
+                            type="checkbox"
+                            name="avoid_tolls"
+                            value="1"
+                            @checked($plan->avoid_tolls)
+                        >
+                        <span class="switch-track" aria-hidden="true"></span>
+                    </label>
+                </form>
+
+                <button class="button button-wide save-order" form="route-order-form" disabled>
+                    Επαναϋπολογισμός διαδρομής
+                    <span>→</span>
+                </button>
 
                 <dialog id="add-stop-dialog" class="stop-dialog">
                     <form method="post" action="{{ route('route-plans.stops.store', $plan) }}">
@@ -422,6 +438,8 @@
             const editStopForm = document.querySelector('#edit-stop-form');
             const editStopAddress = document.querySelector('#edit-stop-address');
             const deleteStopForm = document.querySelector('#delete-stop-form');
+            const routeOptionsForm = document.querySelector('#route-options-form');
+            const avoidTollsToggle = routeOptionsForm.querySelector('[name="avoid_tolls"][type="checkbox"]');
             let draggedStop = null;
             let orderBeforeDragging = null;
             let orderSubmissionStarted = false;
@@ -443,6 +461,13 @@
                 window.persistDromosMapView?.();
                 orderForm.requestSubmit();
             }
+
+            avoidTollsToggle.addEventListener('change', () => {
+                window.persistDromosMapView?.();
+                routeOptionsForm.style.pointerEvents = 'none';
+                routeOptionsForm.style.opacity = '.65';
+                routeOptionsForm.requestSubmit();
+            });
 
             document.querySelectorAll('.copy-google-link').forEach((button) => button.addEventListener('click', async () => {
                 const originalLabel = button.textContent;

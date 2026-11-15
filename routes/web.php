@@ -21,6 +21,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/routes/{routePlan}', [RoutePlanController::class, 'show'])->name('route-plans.show');
     Route::post('/routes/{routePlan}/stops', [RoutePlanController::class, 'storeStop'])->name('route-plans.stops.store');
     Route::patch('/routes/{routePlan}/order', [RoutePlanController::class, 'reorder'])->name('route-plans.reorder');
+    Route::patch('/routes/{routePlan}/options', [RoutePlanController::class, 'updateOptions'])->name('route-plans.options.update');
     Route::patch('/routes/{routePlan}/stops/{stop}', [RoutePlanController::class, 'updateStop'])->name('route-plans.stops.update');
     Route::delete('/routes/{routePlan}/stops/{stop}', [RoutePlanController::class, 'destroyStop'])->name('route-plans.stops.destroy');
 });
