@@ -31,6 +31,7 @@
         <env name="GOOGLE_MAPS_SERVER_KEY" value=""/>
         <env name="GOOGLE_MAPS_BROWSER_KEY" value=""/>
         <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="SMS_FEATURE_ENABLED" value="true"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>

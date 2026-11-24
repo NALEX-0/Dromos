@@ -12,7 +12,14 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Kept for a future SMS re-enable. With SMS disabled, no webhook route is registered.
+        $middleware->validateCsrfTokens(except: [
+            'webhooks/modulus/delivery-reports/*',
+        ]);
+
+        $middleware->alias([
+            'admin' => EnsureAdmin::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

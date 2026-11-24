@@ -11,7 +11,7 @@ final readonly class AddRouteStop
 {
     public function __construct(private Geocoder $geocoder, private ReorderRoutePlan $reorderRoutePlan) {}
 
-    public function execute(RoutePlan $plan, string $address): RoutePlan
+    public function execute(RoutePlan $plan, string $address, ?string $phone = null): RoutePlan
     {
         $maximumStops = $plan->route_mode === 'ordered' ? 100 : 25;
 
@@ -19,7 +19,7 @@ final readonly class AddRouteStop
             throw ValidationException::withMessages(['stop' => "Μπορείτε να προσθέσετε έως {$maximumStops} στάσεις."]);
         }
 
-        return DB::transaction(function () use ($plan, $address) {
+        return DB::transaction(function () use ($plan, $address, $phone) {
             $geocoded = $this->geocoder->geocode("{$address}, Greece");
             $nextOrder = $plan->stops()->where('type', 'visit')->max('optimized_order') + 1;
             $nextInputOrder = $plan->stops()->max('input_order') + 1;
@@ -29,6 +29,7 @@ final readonly class AddRouteStop
                 'input_order' => $nextInputOrder,
                 'optimized_order' => $nextOrder,
                 'address' => $address,
+                'phone' => $phone,
                 'city' => '',
                 'formatted_address' => $geocoded->formattedAddress,
                 'latitude' => $geocoded->latitude,

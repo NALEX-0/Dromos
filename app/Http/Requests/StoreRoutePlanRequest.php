@@ -2,11 +2,30 @@
 
 namespace App\Http\Requests;
 
+use App\Support\GreekMobilePhone;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreRoutePlanRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        $stops = collect($this->input('stops', []))->map(function ($stop) {
+            if (! config('services.sms.enabled')) {
+                $stop['phone'] = null;
+
+                return $stop;
+            }
+
+            $phone = $stop['phone'] ?? null;
+            $stop['phone'] = GreekMobilePhone::normalize($phone) ?? $phone;
+
+            return $stop;
+        })->all();
+
+        $this->merge(['stops' => $stops]);
+    }
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -33,6 +52,7 @@ class StoreRoutePlanRequest extends FormRequest
             'start.region' => ['nullable', 'string', 'max:100'],
             'stops' => ['required', 'array', 'min:2', 'max:25'],
             'stops.*.address' => ['required', 'string', 'max:255'],
+            'stops.*.phone' => ['nullable', 'regex:/^3069\d{8}$/'],
             'stops.*.postal_code' => ['nullable', 'string', 'max:10'],
             'stops.*.city' => ['nullable', 'string', 'max:100'],
             'stops.*.region' => ['nullable', 'string', 'max:100'],
@@ -47,6 +67,7 @@ class StoreRoutePlanRequest extends FormRequest
             'stops.min' => 'Προσθέστε τουλάχιστον δύο στάσεις για τη βελτιστοποίηση της διαδρομής.',
             'stops.max' => 'Μπορείτε να προσθέσετε έως 25 στάσεις.',
             'stops.*.address.required' => 'Η διεύθυνση κάθε στάσης είναι υποχρεωτική.',
+            'stops.*.phone.regex' => 'Το τηλέφωνο πρέπει να είναι έγκυρος ελληνικός αριθμός κινητού.',
         ];
     }
 }

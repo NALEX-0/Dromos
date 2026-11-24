@@ -12,14 +12,15 @@ final readonly class UpdateRouteStop
 {
     public function __construct(private Geocoder $geocoder, private ReorderRoutePlan $reorderRoutePlan) {}
 
-    public function execute(RoutePlan $plan, Stop $stop, string $address): RoutePlan
+    public function execute(RoutePlan $plan, Stop $stop, string $address, ?string $phone = null): RoutePlan
     {
         $this->ensureStopBelongsToPlan($plan, $stop);
 
-        return DB::transaction(function () use ($plan, $stop, $address) {
+        return DB::transaction(function () use ($plan, $stop, $address, $phone) {
             $geocoded = $this->geocoder->geocode("{$address}, Greece");
             $stop->update([
                 'address' => $address,
+                'phone' => $phone,
                 'formatted_address' => $geocoded->formattedAddress,
                 'latitude' => $geocoded->latitude,
                 'longitude' => $geocoded->longitude,

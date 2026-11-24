@@ -4,11 +4,14 @@ namespace App\Providers;
 
 use App\Contracts\Geocoder;
 use App\Contracts\RouteOptimizer;
+use App\Contracts\SmsGateway;
 use App\Services\CachedGeocoder;
 use App\Services\Demo\DemoGeocoder;
 use App\Services\Demo\DemoRouteOptimizer;
 use App\Services\Google\GoogleGeocoder;
 use App\Services\Google\GoogleRouteOptimizer;
+use App\Services\Sms\FakeSmsGateway;
+use App\Services\Sms\ModulusSmsGateway;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -25,6 +28,10 @@ class AppServiceProvider extends ServiceProvider
             return new CachedGeocoder($app->make($provider));
         });
         $this->app->bind(RouteOptimizer::class, $google ? GoogleRouteOptimizer::class : DemoRouteOptimizer::class);
+        $this->app->bind(
+            SmsGateway::class,
+            config('services.sms.driver') === 'modulus' ? ModulusSmsGateway::class : FakeSmsGateway::class,
+        );
     }
 
     /**

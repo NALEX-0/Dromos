@@ -45,6 +45,31 @@ services:
       retries: 20
       start_period: 30s
 
+  # SMS worker temporarily disabled. Restore this service when SMS_FEATURE_ENABLED=true.
+  # worker:
+  #   build:
+  #     context: .
+  #     target: app
+  #   restart: unless-stopped
+  #   env_file:
+  #     - .env.docker
+  #   environment:
+  #     DB_PREFIX: dro_
+  #   depends_on:
+  #     app:
+  #       condition: service_healthy
+  #   volumes:
+  #     - app_storage:/var/www/html/storage
+  #   command:
+  #     - php
+  #     - artisan
+  #     - queue:work
+  #     - --queue=sms,default
+  #     - --sleep=2
+  #     - --tries=3
+  #     - --timeout=30
+  #     - --max-time=3600
+
   web:
     build:
       context: .

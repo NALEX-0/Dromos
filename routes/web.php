@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AdminController;
+use App\Http\Controllers\ColoredRouteController;
+use App\Http\Controllers\ModulusWebhookController;
 use App\Http\Controllers\RoutePlanController;
 use Illuminate\Support\Facades\Route;
 
@@ -11,8 +14,16 @@ Route::middleware('guest')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
 });
 
+Route::get('/shared/routes/{shareToken}', [RoutePlanController::class, 'shared'])->name('route-plans.shared');
+if (config('services.sms.enabled')) {
+    Route::post('/webhooks/modulus/delivery-reports/{token}', [ModulusWebhookController::class, 'deliveryReport'])
+        ->name('webhooks.modulus.dlr');
+    Route::post('/shared/routes/{shareToken}/stops/{stop}/notifications', [RoutePlanController::class, 'notifySharedStop'])
+        ->middleware('throttle:6,1')
+        ->name('route-plans.shared.stops.notifications.store');
+}
+
 Route::middleware('auth')->group(function () {
-    Route::get('/shared/routes/{shareToken}', [RoutePlanController::class, 'shared'])->name('route-plans.shared');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/', [RoutePlanController::class, 'create'])->name('route-plans.create');
     Route::get('/routes', [RoutePlanController::class, 'index'])->name('route-plans.index');
@@ -27,5 +38,8 @@ Route::middleware('auth')->group(function () {
     Route::patch('/routes/{routePlan}/order', [RoutePlanController::class, 'reorder'])->name('route-plans.reorder');
     Route::patch('/routes/{routePlan}/options', [RoutePlanController::class, 'updateOptions'])->name('route-plans.options.update');
     Route::patch('/routes/{routePlan}/stops/{stop}', [RoutePlanController::class, 'updateStop'])->name('route-plans.stops.update');
+    if (config('services.sms.enabled')) {
+        Route::post('/routes/{routePlan}/stops/{stop}/notifications', [RoutePlanController::class, 'notifyStop'])->name('route-plans.stops.notifications.store');
+    }
     Route::delete('/routes/{routePlan}/stops/{stop}', [RoutePlanController::class, 'destroyStop'])->name('route-plans.stops.destroy');
 });

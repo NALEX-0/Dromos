@@ -7,6 +7,7 @@ use App\Actions\CreateOptimizedRoutePlan;
 use App\Actions\CreateOrderedRoutePlan;
 use App\Actions\DeleteRouteStop;
 use App\Actions\ReorderRoutePlan;
+use App\Actions\SendStopNotification;
 use App\Actions\UpdateRouteStop;
 use App\Actions\UpdateRouteOptions;
 use App\Http\Requests\StoreOrderedRoutePlanRequest;
@@ -14,6 +15,7 @@ use App\Http\Requests\StoreRoutePlanRequest;
 use App\Models\RoutePlan;
 use App\Models\Stop;
 use App\Services\GoogleMapsRouteUrlBuilder;
+use App\Support\GreekMobilePhone;
 use Illuminate\Http\Request;
 use Throwable;
 
@@ -92,7 +94,7 @@ class RoutePlanController extends Controller
     {
         $this->authorize('view', $routePlan);
         $routePlan->ensureShareToken();
-        $routePlan->load(['stops' => fn ($q) => $q->orderBy('optimized_order')]);
+        $routePlan->load(['stops' => fn ($q) => $q->with('latestNotification')->orderBy('optimized_order')]);
 
         return view('route-plans.workspace', [
             'plan' => $routePlan,
@@ -108,7 +110,7 @@ class RoutePlanController extends Controller
             ->where('share_token', $shareToken)
             ->where('status', 'ready')
             ->firstOrFail();
-        $routePlan->load(['stops' => fn ($query) => $query->orderBy('optimized_order')]);
+        $routePlan->load(['stops' => fn ($query) => $query->with('latestNotification')->orderBy('optimized_order')]);
 
         return view('route-plans.shared', [
             'plan' => $routePlan,
@@ -171,10 +173,16 @@ class RoutePlanController extends Controller
     public function storeStop(Request $request, RoutePlan $routePlan, AddRouteStop $action)
     {
         $this->authorize('update', $routePlan);
-        $data = $request->validate(['address' => ['required', 'string', 'max:255']]);
+        $smsEnabled = (bool) config('services.sms.enabled');
+        $rules = ['address' => ['required', 'string', 'max:255']];
+        if ($smsEnabled) {
+            $request->merge(['phone' => GreekMobilePhone::normalize($request->input('phone')) ?? $request->input('phone')]);
+            $rules['phone'] = ['nullable', 'regex:/^3069\d{8}$/'];
+        }
+        $data = $request->validate($rules, ['phone.regex' => 'Το τηλέφωνο πρέπει να είναι έγκυρος ελληνικός αριθμός κινητού.']);
 
         try {
-            $action->execute($routePlan, $data['address']);
+            $action->execute($routePlan, $data['address'], $smsEnabled ? ($data['phone'] ?? null) : null);
         } catch (Throwable $exception) {
             report($exception);
 
@@ -187,10 +195,16 @@ class RoutePlanController extends Controller
     public function updateStop(Request $request, RoutePlan $routePlan, Stop $stop, UpdateRouteStop $action)
     {
         $this->authorize('update', $routePlan);
-        $data = $request->validate(['address' => ['required', 'string', 'max:255']]);
+        $smsEnabled = (bool) config('services.sms.enabled');
+        $rules = ['address' => ['required', 'string', 'max:255']];
+        if ($smsEnabled) {
+            $request->merge(['phone' => GreekMobilePhone::normalize($request->input('phone')) ?? $request->input('phone')]);
+            $rules['phone'] = ['nullable', 'regex:/^3069\d{8}$/'];
+        }
+        $data = $request->validate($rules, ['phone.regex' => 'Το τηλέφωνο πρέπει να είναι έγκυρος ελληνικός αριθμός κινητού.']);
 
         try {
-            $action->execute($routePlan, $stop, $data['address']);
+            $action->execute($routePlan, $stop, $data['address'], $smsEnabled ? ($data['phone'] ?? null) : null);
         } catch (Throwable $exception) {
             report($exception);
 
@@ -212,5 +226,74 @@ class RoutePlanController extends Controller
         }
 
         return redirect()->route('route-plans.show', $routePlan)->with('status', 'Η στάση διαγράφηκε και η διαδρομή υπολογίστηκε ξανά.');
+    }
+
+    public function notifyStop(RoutePlan $routePlan, Stop $stop, SendStopNotification $action)
+    {
+        $this->authorize('update', $routePlan);
+
+        abort_unless($stop->route_plan_id === $routePlan->id && $stop->type === 'visit', 404);
+
+        if (! $stop->phone) {
+            return back()->withErrors(['notification' => 'Προσθέστε πρώτα τηλέφωνο σε αυτή τη στάση.']);
+        }
+
+        try {
+            $notification = $action->execute($stop, request()->user());
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return back()->withErrors(['notification' => 'Το SMS δεν μπήκε στην ουρά: '.$exception->getMessage()]);
+        }
+
+        if (! $notification->wasRecentlyCreated) {
+            return back()->with('status', 'Υπάρχει ήδη πρόσφατη ειδοποίηση SMS για αυτή τη στάση.');
+        }
+
+        return back()->with('status', 'Η ειδοποίηση SMS μπήκε στην ουρά αποστολής.');
+    }
+
+    public function notifySharedStop(string $shareToken, Stop $stop, SendStopNotification $action)
+    {
+        $routePlan = RoutePlan::query()
+            ->where('share_token', $shareToken)
+            ->where('status', 'ready')
+            ->with('user')
+            ->firstOrFail();
+
+        abort_unless($stop->route_plan_id === $routePlan->id && $stop->type === 'visit', 404);
+
+        if (! $stop->phone) {
+            return back()->withErrors(['notification' => 'Δεν υπάρχει τηλέφωνο για αυτή τη στάση.']);
+        }
+
+        try {
+            $notification = $action->execute($stop, $routePlan->user);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return back()->withErrors(['notification' => 'Το SMS δεν μπήκε στην ουρά: '.$exception->getMessage()]);
+        }
+
+        if (! $notification->wasRecentlyCreated) {
+            return back()->with('status', 'Υπάρχει ήδη πρόσφατη ειδοποίηση SMS για αυτή τη στάση.');
+        }
+
+        return back()->with('status', 'Η ειδοποίηση SMS μπήκε στην ουρά αποστολής.');
+    }
+
+    private function enabledColoredRoutes(): array
+    {
+        return ColoredRoute::query()
+            ->where('is_enabled', true)
+            ->get(['id', 'name', 'color', 'encoded_polyline', 'path', 'is_circular'])
+            ->map(fn ($route) => [
+                'id' => $route->id,
+                'name' => $route->name,
+                'color' => $route->color,
+                'encodedPolyline' => $route->encoded_polyline,
+                'path' => $route->path,
+                'isCircular' => $route->is_circular,
+            ])->all();
     }
 }
