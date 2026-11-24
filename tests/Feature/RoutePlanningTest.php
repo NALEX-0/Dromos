@@ -3,13 +3,17 @@
 namespace Tests\Feature;
 
 use App\Contracts\Geocoder;
+use App\Contracts\SmsGateway;
 use App\Data\GeocodedAddress;
+use App\Jobs\SendStopSms;
+use App\Models\ColoredRoute;
 use App\Models\RoutePlan;
 use App\Models\User;
 use App\Services\CachedGeocoder;
 use App\Services\GoogleMapsRouteUrlBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class RoutePlanningTest extends TestCase
@@ -27,9 +31,12 @@ class RoutePlanningTest extends TestCase
     {
         $this->get('/')
             ->assertOk()
+            ->assertSee('class="route-create-page"', false)
             ->assertSee('Dromos')
             ->assertSee('Οι διαδρομές μου')
-            ->assertSee('Βελτιστοποίηση διαδρομής')
+            ->assertSee('Σειριακή διαδρομή')
+            ->assertSee('Υπολογισμός σειριακής διαδρομής')
+            ->assertSee('href="'.route('ordered-route-plans.create').'" class="is-active"', false)
             ->assertSee('aria-current="page"', false)
             ->assertSee('Θράκης 11, 13671, Αχαρνές')
             ->assertSee('Εισαγωγή διευθύνσεων')
@@ -38,23 +45,135 @@ class RoutePlanningTest extends TestCase
             ->assertDontSee('name="start[city]"', false);
     }
 
-    public function test_map_style_demo_page_is_available(): void
+    public function test_optimized_planner_remains_available_from_its_tab(): void
     {
-        config([
-            'services.google.browser_key' => 'test-browser-key',
+        $this->get(route('optimized-route-plans.create'))
+            ->assertOk()
+            ->assertSee('Σχεδιασμός διαδρομής')
+            ->assertSee('Βελτιστοποίηση διαδρομής')
+            ->assertSee('href="'.route('optimized-route-plans.create').'" class="is-active"', false);
+    }
+
+    public function test_colored_routes_page_is_available_to_admins(): void
+    {
+        auth()->user()->update(['role' => 'admin']);
+        config(['services.google.browser_key' => 'test-browser-key']);
+
+        $this->get(route('colored-routes.index'))
+            ->assertOk()
+            ->assertSee('Χρώματα διαδρομών')
+            ->assertSee('id="colored-route-form"', false)
+            ->assertSee('id="overlay-route-name"', false)
+            ->assertSee('id="overlay-route-addresses"', false)
+            ->assertSee('id="custom-route-color"', false)
+            ->assertSee('new google.maps.Polyline', false)
+            ->assertSee('new google.maps.Polygon', false)
+            ->assertSee('fillColor: route.color', false)
+            ->assertSee('data-color="#FF21DE"', false)
+            ->assertSee('decodePath', false)
+            ->assertSee('fullscreenControl: false', false);
+    }
+
+    public function test_user_can_create_toggle_edit_and_delete_a_colored_route(): void
+    {
+        auth()->user()->update(['role' => 'admin']);
+        $this->post(route('colored-routes.store'), [
+            'name' => 'Πρωινή διαδρομή',
+            'color' => '#2878d0',
+            'addresses' => "Θράκης 11, 13671, Αχαρνές\nΣύνταγμα, 10563, Αθήνα\nΘράκης 11, 13671, Αχαρνές",
+        ])->assertRedirect();
+
+        $coloredRoute = ColoredRoute::firstOrFail();
+        $this->assertTrue($coloredRoute->is_enabled);
+        $this->assertTrue($coloredRoute->is_circular);
+        $this->assertSame(auth()->id(), $coloredRoute->user_id);
+
+        $this->patch(route('colored-routes.toggle', $coloredRoute))->assertRedirect();
+        $this->assertFalse($coloredRoute->fresh()->is_enabled);
+
+        $this->patch(route('colored-routes.update', $coloredRoute), [
+            'name' => 'Απογευματινή διαδρομή',
+            'color' => '#FF21DE',
+            'addresses' => "Θράκης 11, 13671, Αχαρνές\nΣύνταγμα, 10563, Αθήνα",
+        ])->assertRedirect();
+        $this->assertSame('Απογευματινή διαδρομή', $coloredRoute->fresh()->name);
+
+        $this->delete(route('colored-routes.destroy', $coloredRoute))->assertRedirect();
+        $this->assertDatabaseMissing('colored_routes', ['id' => $coloredRoute->id]);
+    }
+
+    public function test_enabled_colored_routes_are_supplied_to_both_route_creation_maps(): void
+    {
+        config(['services.google.browser_key' => 'test-browser-key']);
+        $admin = User::factory()->create(['role' => 'admin']);
+        $enabled = ColoredRoute::create([
+            'user_id' => $admin->id,
+            'name' => 'Ενεργή ζώνη',
+            'color' => '#E6392F',
+            'addresses' => ['Α', 'Β'],
+            'path' => [['lat' => 37.98, 'lng' => 23.72], ['lat' => 38.01, 'lng' => 23.75]],
+            'is_enabled' => true,
+        ]);
+        $disabled = ColoredRoute::create([
+            'user_id' => $admin->id,
+            'name' => 'Ανενεργή ζώνη',
+            'color' => '#2878D0',
+            'addresses' => ['Α', 'Β'],
+            'path' => [['lat' => 37.90, 'lng' => 23.60], ['lat' => 37.91, 'lng' => 23.61]],
+            'is_enabled' => false,
         ]);
 
-        $this->get(route('map-style-demo'))
+        foreach ([route('ordered-route-plans.create'), route('optimized-route-plans.create')] as $url) {
+            $this->get($url)
+                ->assertOk()
+                ->assertSee('window.dromosColoredRoutes', false)
+                ->assertSee('"id":'.$enabled->id, false)
+                ->assertDontSee('"id":'.$disabled->id, false);
+        }
+    }
+
+    public function test_normal_users_cannot_access_administration(): void
+    {
+        $this->get(route('admin.dashboard'))->assertForbidden();
+        $this->get(route('admin.routes'))->assertForbidden();
+        $this->get(route('admin.sms'))->assertForbidden();
+        $this->get(route('admin.api-usage'))->assertForbidden();
+        $this->get(route('colored-routes.index'))->assertForbidden();
+        $this->post(route('colored-routes.store'), [])->assertForbidden();
+    }
+
+    public function test_admin_can_view_and_edit_every_users_routes(): void
+    {
+        $admin = auth()->user();
+        $admin->update(['role' => 'admin']);
+        $owner = User::factory()->create();
+        $plan = RoutePlan::create([
+            'user_id' => $owner->id,
+            'name' => 'Διαδρομή πελάτη',
+            'status' => 'ready',
+        ]);
+
+        $this->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertSee('Χρωματισμός περιοχών')
-            ->assertSee('id="area-search-form"', false)
-            ->assertSee('id="colored-areas-list"', false)
-            ->assertSee('id="map-style-map"', false)
-            ->assertSee('new google.maps.Polygon', false)
-            ->assertSee('addColoredArea', false)
-            ->assertSee('nominatim.openstreetmap.org/search', false)
-            ->assertSee('OpenStreetMap contributors')
-            ->assertSee('app-navigation-link is-active', false);
+            ->assertSee('Πίνακας διαχείρισης')
+            ->assertSee('class="admin-session"', false)
+            ->assertSee('admin-account-badge', false);
+
+        $this->get(route('admin.routes'))
+            ->assertOk()
+            ->assertSee('Διαδρομή πελάτη')
+            ->assertSee($owner->email);
+
+        $this->get(route('route-plans.index'))
+            ->assertOk()
+            ->assertSee('Όλες οι διαδρομές')
+            ->assertSee('Διαδρομή πελάτη')
+            ->assertSee($owner->email);
+
+        $this->patch(route('route-plans.update', $plan), ['name' => 'Ενημερωμένη διαδρομή'])
+            ->assertRedirect();
+
+        $this->assertSame('Ενημερωμένη διαδρομή', $plan->fresh()->name);
     }
 
     public function test_route_history_lists_only_the_authenticated_users_routes(): void
@@ -70,10 +189,29 @@ class RoutePlanningTest extends TestCase
 
         $this->get(route('route-plans.index'))
             ->assertOk()
+            ->assertSee('route-history-document', false)
+            ->assertSee('route-history-page', false)
             ->assertSee('Οι διαδρομές μου')
             ->assertSee('Πρωινές παραδόσεις')
             ->assertSee('Syntagma, Athens')
             ->assertDontSee('Ξένη διαδρομή');
+    }
+
+    public function test_route_history_uses_the_dromos_paginator(): void
+    {
+        foreach (range(1, 13) as $number) {
+            RoutePlan::create([
+                'user_id' => auth()->id(),
+                'name' => 'Διαδρομή '.$number,
+                'status' => 'ready',
+            ]);
+        }
+
+        $this->get(route('route-plans.index'))
+            ->assertOk()
+            ->assertSee('class="dromos-pagination"', false)
+            ->assertSee('Εμφάνιση 1–12')
+            ->assertSee('Επόμενη ›');
     }
 
     public function test_a_route_can_be_renamed_from_its_workspace(): void
@@ -85,6 +223,10 @@ class RoutePlanningTest extends TestCase
         ])->assertRedirect();
 
         $this->assertSame('Παραδόσεις Πειραιά', $plan->fresh()->name);
+        $this->get(route('route-plans.show', $plan))
+            ->assertOk()
+            ->assertSee('class="route-mode-title"', false)
+            ->assertSee('Βελτιστοποιημένη διαδρομή');
     }
 
     public function test_a_route_can_be_deleted_from_history(): void
@@ -121,11 +263,22 @@ class RoutePlanningTest extends TestCase
         $this->assertTrue($plan->provider_payload['avoid_tolls']);
 
         config(['services.google.browser_key' => 'test-browser-key']);
+        $coloredRoute = ColoredRoute::create([
+            'user_id' => auth()->id(),
+            'name' => 'Διαδρομή αναφοράς',
+            'color' => '#E6392F',
+            'addresses' => ['Α', 'Β'],
+            'path' => [['lat' => 37.98, 'lng' => 23.72], ['lat' => 38.01, 'lng' => 23.75]],
+            'is_enabled' => true,
+        ]);
 
         $this->get(route('route-plans.show', $plan))
             ->assertOk()
+            ->assertSee('"id":'.$coloredRoute->id, false)
             ->assertSee('Όνομα διαδρομής')
             ->assertSee('Αποφυγή διοδίων')
+            ->assertSee('Άνοιγμα στο Google Maps')
+            ->assertSee('Κοινοποίηση διαδρομής Dromos')
             ->assertSee('id="route-options-form"', false)
             ->assertSeeInOrder([
                 '＋ Προσθήκη στάσης',
@@ -153,30 +306,123 @@ class RoutePlanningTest extends TestCase
         $this->get(route('route-plans.show', $plan))->assertOk()->assertSee('1 ώρα 5 λεπτά');
     }
 
-    public function test_a_shared_route_requires_login_and_is_read_only(): void
+    public function test_a_stop_phone_is_normalized_and_saved(): void
     {
+        $response = $this->post('/routes', [
+            'start' => ['address' => 'Syntagma, Athens'],
+            'stops' => [
+                ['address' => 'Acropolis, Athens', 'phone' => '6912345678'],
+                ['address' => 'Monastiraki, Athens', 'phone' => ''],
+            ],
+        ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('stops', [
+            'address' => 'Acropolis, Athens',
+            'phone' => '306912345678',
+        ]);
+        $this->assertDatabaseHas('stops', [
+            'address' => 'Monastiraki, Athens',
+            'phone' => null,
+        ]);
+    }
+
+    public function test_a_driver_can_queue_an_sms_notification_for_a_stop(): void
+    {
+        Queue::fake();
+        config(['services.sms.driver' => 'fake']);
+        $plan = $this->createRouteWithTwoDestinations();
+        $stop = $plan->stops()->where('type', 'visit')->firstOrFail();
+        $stop->update(['phone' => '306912345678']);
+
+        $this->post(route('route-plans.stops.notifications.store', [$plan, $stop]))
+            ->assertRedirect()
+            ->assertSessionHas('status');
+
+        $this->assertDatabaseHas('stop_notifications', [
+            'stop_id' => $stop->id,
+            'user_id' => auth()->id(),
+            'provider' => 'fake',
+            'phone' => '306912345678',
+            'status' => 'queued',
+        ]);
+
+        Queue::assertPushed(SendStopSms::class);
+    }
+
+    public function test_a_stop_without_a_phone_cannot_be_notified(): void
+    {
+        $plan = $this->createRouteWithTwoDestinations();
+        $stop = $plan->stops()->where('type', 'visit')->firstOrFail();
+
+        $this->post(route('route-plans.stops.notifications.store', [$plan, $stop]))
+            ->assertRedirect()
+            ->assertSessionHasErrors('notification');
+
+        $this->assertDatabaseCount('stop_notifications', 0);
+    }
+
+    public function test_a_shared_route_is_public_read_only_and_can_send_notifications(): void
+    {
+        Queue::fake();
         $plan = $this->createRouteWithTwoDestinations()->fresh();
+        $stop = $plan->stops()->where('type', 'visit')->firstOrFail();
+        $stop->update(['phone' => '306912345678']);
         $shareUrl = route('route-plans.shared', $plan->share_token);
 
         auth()->logout();
 
-        $this->get($shareUrl)->assertRedirect(route('login'));
-
-        $this->actingAs(User::factory()->create());
-
         $this->get($shareUrl)
             ->assertOk()
             ->assertSee('Κοινόχρηστη διαδρομή')
-            ->assertSee('Μόνο για προβολή')
+            ->assertSee('Ειδοποίηση SMS')
             ->assertSee('Syntagma, Athens')
             ->assertSee('Acropolis, Athens')
             ->assertSee('Monastiraki, Athens')
-            ->assertSee('Άνοιγμα στο Google Maps')
+            ->assertDontSee('class="app-sidebar"', false)
+            ->assertDontSee('306912345678')
+            ->assertDontSee('Άνοιγμα στο Google Maps')
+            ->assertDontSee('Σειριακή διαδρομή · χωρίς βελτιστοποίηση σειράς')
             ->assertDontSee('Επεξεργασία')
             ->assertDontSee('Διαγραφή')
             ->assertDontSee('Επαναϋπολογισμός διαδρομής');
 
+        $this->post(route('route-plans.shared.stops.notifications.store', [$plan->share_token, $stop]))
+            ->assertRedirect()
+            ->assertSessionHas('status');
+
+        $this->assertDatabaseHas('stop_notifications', [
+            'stop_id' => $stop->id,
+            'phone' => '306912345678',
+            'status' => 'queued',
+        ]);
+
+        Queue::assertPushed(SendStopSms::class);
+
+        $this->get($shareUrl)
+            ->assertOk()
+            ->assertSee('class="is-sent"', false);
+
         $this->get(route('route-plans.shared', 'invalid-token'))->assertNotFound();
+    }
+
+    public function test_the_sms_job_processes_a_queued_notification(): void
+    {
+        Queue::fake();
+        $plan = $this->createRouteWithTwoDestinations();
+        $stop = $plan->stops()->where('type', 'visit')->firstOrFail();
+        $stop->update(['phone' => '306912345678']);
+
+        $this->post(route('route-plans.stops.notifications.store', [$plan, $stop]));
+        $notification = $stop->notifications()->firstOrFail();
+
+        (new SendStopSms($notification))->handle(app(SmsGateway::class));
+
+        $this->assertDatabaseHas('stop_notifications', [
+            'id' => $notification->id,
+            'status' => 'accepted',
+        ]);
+        $this->assertNotNull($notification->fresh()->provider_message_id);
     }
 
     public function test_stops_can_be_manually_forced_into_an_exact_order(): void
@@ -429,7 +675,9 @@ class RoutePlanningTest extends TestCase
         );
         $this->assertCount(4, $plan->provider_payload['segments']);
         $this->get(route('route-plans.show', $plan))
-            ->assertSee('χωρίς βελτιστοποίηση σειράς')
+            ->assertSee('class="route-mode-title"', false)
+            ->assertSee('Σειριακή διαδρομή')
+            ->assertDontSee('χωρίς βελτιστοποίηση σειράς')
             ->assertSee('Κοινοποίηση διαδρομής Dromos');
     }
 

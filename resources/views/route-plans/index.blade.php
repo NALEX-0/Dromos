@@ -7,8 +7,7 @@
         <header class="history-header">
             <div>
                 <span class="eyebrow">Ιστορικό</span>
-                <h1>Οι διαδρομές μου</h1>
-                <p>Βρείτε, ανοίξτε και διαχειριστείτε προηγούμενες διαδρομές.</p>
+                <h1>{{ auth()->user()->isAdmin() ? 'Όλες οι διαδρομές' : 'Οι διαδρομές μου' }}</h1>
             </div>
         </header>
 
@@ -57,6 +56,9 @@
                                 <div>
                                     <h2>{{ $routePlan->name }}</h2>
                                     <p>{{ $origin?->address ?: 'Χωρίς σημείο εκκίνησης' }}</p>
+                                    @if (auth()->user()->isAdmin())
+                                        <p class="history-route-owner">{{ $routePlan->user?->email ?: 'Χωρίς χρήστη' }}</p>
+                                    @endif
                                 </div>
                             </div>
 
@@ -95,7 +97,7 @@
                 @endforeach
             </div>
 
-            <div class="history-pagination">{{ $routes->links() }}</div>
+            <div class="history-pagination">{{ $routes->links('route-plans.pagination') }}</div>
         @endif
     </div>
 @endsection

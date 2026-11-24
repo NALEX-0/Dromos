@@ -25,11 +25,11 @@ if (config('services.sms.enabled')) {
 
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
-    Route::get('/', [RoutePlanController::class, 'create'])->name('route-plans.create');
+    Route::get('/', [RoutePlanController::class, 'createOrdered'])->name('route-plans.create');
+    Route::get('/optimized-routes/create', [RoutePlanController::class, 'create'])->name('optimized-route-plans.create');
     Route::get('/routes', [RoutePlanController::class, 'index'])->name('route-plans.index');
     Route::post('/routes', [RoutePlanController::class, 'store'])->name('route-plans.store');
     Route::get('/ordered-routes/create', [RoutePlanController::class, 'createOrdered'])->name('ordered-route-plans.create');
-    Route::get('/map-style-demo', [RoutePlanController::class, 'mapStyleDemo'])->name('map-style-demo');
     Route::post('/ordered-routes', [RoutePlanController::class, 'storeOrdered'])->name('ordered-route-plans.store');
     Route::get('/routes/{routePlan}', [RoutePlanController::class, 'show'])->name('route-plans.show');
     Route::patch('/routes/{routePlan}', [RoutePlanController::class, 'update'])->name('route-plans.update');

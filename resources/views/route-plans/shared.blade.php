@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.shared')
 
 @section('title', 'Κοινόχρηστη διαδρομή — Dromos')
 
@@ -9,6 +9,7 @@
         $durationMinutes = intdiv($plan->total_duration_seconds, 60);
         $durationHours = intdiv($durationMinutes, 60);
         $remainingMinutes = $durationMinutes % 60;
+        $smsEnabled = (bool) config('services.sms.enabled');
     @endphp
 
     <div class="workspace-grid shared-route">
@@ -20,7 +21,15 @@
                 </div>
             </div>
 
-            <div class="shared-route-note">Μόνο για προβολή · η διαδρομή δεν μπορεί να τροποποιηθεί</div>
+            @if (session('status'))
+                <div class="shared-toast success" role="status">{{ session('status') }}</div>
+            @endif
+
+            @if ($smsEnabled)
+                @error('notification')
+                    <div class="shared-toast error" role="alert">{{ $message }}</div>
+                @enderror
+            @endif
 
             <div class="mini-summary">
                 <div>
@@ -43,18 +52,7 @@
                 <div class="route-constraint">✓ Αποφυγή διοδίων ενεργή</div>
             @endif
 
-            @if ($plan->route_mode === 'ordered')
-                <div class="route-constraint ordered-mode-badge">Σειριακή διαδρομή · χωρίς βελτιστοποίηση σειράς</div>
-            @endif
-
             <div class="share-route">
-                <div class="share-route-links" style="--segment-count: {{ min(count($googleMapsLinks), 3) }}">
-                    @foreach ($googleMapsLinks as $googleMapsLink)
-                        <a href="{{ $googleMapsLink }}" target="_blank" rel="noopener" class="google-maps-link">
-                            {{ count($googleMapsLinks) === 1 ? 'Άνοιγμα στο Google Maps' : 'Άνοιγμα τμήματος '.$loop->iteration }}
-                        </a>
-                    @endforeach
-                </div>
                 <button type="button" id="share-dromos-route" data-url="{{ $shareUrl }}">
                     Κοινοποίηση διαδρομής
                 </button>
@@ -73,6 +71,8 @@
                 @foreach ($visits as $stop)
                     @php
                         $googleMapsLocation = $stop->formatted_address ?: $stop->address;
+                        $notificationStatus = $smsEnabled ? $stop->latestNotification?->status : null;
+                        $notificationIsActive = $smsEnabled && in_array($notificationStatus, ['queued', 'sending', 'retrying', 'accepted', 'delivered'], true);
                         $stopGoogleMapsUrl = 'https://www.google.com/maps/search/?'.http_build_query([
                             'api' => 1,
                             'query' => $googleMapsLocation,
@@ -93,6 +93,19 @@
                                 rel="noopener"
                                 class="share-stop"
                             >Άνοιγμα</a>
+                            @if ($smsEnabled && $stop->phone)
+                                <form
+                                    method="post"
+                                    action="{{ route('route-plans.shared.stops.notifications.store', [$plan->share_token, $stop]) }}"
+                                    class="shared-notify-form"
+                                    onsubmit="return confirm('Να σταλεί SMS για αυτή τη στάση;')"
+                                >
+                                    @csrf
+                                    <button type="submit" class="{{ $notificationIsActive ? 'is-sent' : '' }}">
+                                        {{ in_array($notificationStatus, ['queued', 'sending', 'retrying'], true) ? 'Σε αναμονή' : ($notificationIsActive ? 'Επανάληψη SMS' : 'Ειδοποίηση SMS') }}
+                                    </button>
+                                </form>
+                            @endif
                         </div>
                     </article>
                 @endforeach
@@ -116,6 +129,13 @@
 
 @push('scripts')
     <script>
+        const sharedToast = document.querySelector('.shared-toast');
+
+        if (sharedToast) {
+            window.setTimeout(() => sharedToast.classList.add('is-hiding'), 3500);
+            window.setTimeout(() => sharedToast.remove(), 3900);
+        }
+
         document.querySelector('#share-dromos-route').addEventListener('click', async (event) => {
             const button = event.currentTarget;
             const originalLabel = button.textContent;

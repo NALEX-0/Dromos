@@ -113,7 +113,7 @@ class RoutePlanController extends Controller
         ]);
     }
 
-    public function shared(string $shareToken, GoogleMapsRouteUrlBuilder $urlBuilder)
+    public function shared(string $shareToken)
     {
         $routePlan = RoutePlan::query()
             ->where('share_token', $shareToken)
@@ -124,7 +124,6 @@ class RoutePlanController extends Controller
         return view('route-plans.shared', [
             'plan' => $routePlan,
             'browserKey' => config('services.google.browser_key'),
-            'googleMapsLinks' => $urlBuilder->build($routePlan),
             'shareUrl' => route('route-plans.shared', $routePlan->share_token),
         ]);
     }
