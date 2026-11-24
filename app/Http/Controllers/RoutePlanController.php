@@ -12,6 +12,7 @@ use App\Actions\UpdateRouteStop;
 use App\Actions\UpdateRouteOptions;
 use App\Http\Requests\StoreOrderedRoutePlanRequest;
 use App\Http\Requests\StoreRoutePlanRequest;
+use App\Models\ColoredRoute;
 use App\Models\RoutePlan;
 use App\Models\Stop;
 use App\Services\GoogleMapsRouteUrlBuilder;
@@ -51,18 +52,23 @@ class RoutePlanController extends Controller
 
     public function create()
     {
-        return view('route-plans.workspace', ['plan' => null, 'browserKey' => config('services.google.browser_key'), 'plannerMode' => 'optimized', 'maximumStops' => 25]);
+        return view('route-plans.workspace', [
+            'plan' => null,
+            'browserKey' => config('services.google.browser_key'),
+            'plannerMode' => 'optimized',
+            'maximumStops' => 25,
+            'coloredRoutes' => $this->enabledColoredRoutes(),
+        ]);
     }
 
     public function createOrdered()
     {
-        return view('route-plans.workspace', ['plan' => null, 'browserKey' => config('services.google.browser_key'), 'plannerMode' => 'ordered', 'maximumStops' => 100]);
-    }
-
-    public function mapStyleDemo()
-    {
-        return view('map-style-demo', [
+        return view('route-plans.workspace', [
+            'plan' => null,
             'browserKey' => config('services.google.browser_key'),
+            'plannerMode' => 'ordered',
+            'maximumStops' => 100,
+            'coloredRoutes' => $this->enabledColoredRoutes(),
         ]);
     }
 
@@ -103,6 +109,7 @@ class RoutePlanController extends Controller
             'browserKey' => config('services.google.browser_key'),
             'googleMapsLinks' => $urlBuilder->build($routePlan),
             'shareUrl' => route('route-plans.shared', $routePlan->share_token),
+            'coloredRoutes' => $this->enabledColoredRoutes(),
         ]);
     }
 

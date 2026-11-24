@@ -7,6 +7,7 @@
         $plannerMode = $plannerMode ?? $plan?->route_mode ?? 'optimized';
         $maximumStops = $maximumStops ?? ($plannerMode === 'ordered' ? 100 : 25);
         $isOrderedPlanner = $plannerMode === 'ordered';
+        $smsEnabled = (bool) config('services.sms.enabled');
     @endphp
     <div class="workspace-grid">
         <aside class="workspace-sidebar">
@@ -20,8 +21,8 @@
 
             @if (! $plan)
                 <div class="planner-mode-tabs" aria-label="Τύπος διαδρομής">
-                    <a href="{{ route('route-plans.create') }}" class="{{ ! $isOrderedPlanner ? 'is-active' : '' }}">Βελτιστοποιημένη</a>
                     <a href="{{ route('ordered-route-plans.create') }}" class="{{ $isOrderedPlanner ? 'is-active' : '' }}">Σειριακή</a>
+                    <a href="{{ route('optimized-route-plans.create') }}" class="{{ ! $isOrderedPlanner ? 'is-active' : '' }}">Βελτιστοποιημένη</a>
                 </div>
 
                 <div class="workspace-heading">
@@ -89,6 +90,15 @@
                                         placeholder="Οδός και αριθμός, Τ.Κ., πόλη"
                                         required
                                     >
+                                    @if ($smsEnabled)
+                                        <input
+                                            class="stop-phone-input"
+                                            name="stops[{{ $index }}][phone]"
+                                            value="{{ $stop['phone'] ?? '' }}"
+                                            placeholder="Κινητό (προαιρετικό)"
+                                            inputmode="tel"
+                                        >
+                                    @endif
                                 </div>
 
                                 <button type="button" class="remove" aria-label="Αφαίρεση στάσης">×</button>
@@ -131,7 +141,13 @@
                     <h2>Εισαγωγή διευθύνσεων</h2>
                     <label for="import-addresses">Μία πλήρης διεύθυνση ανά γραμμή</label>
                     <textarea id="import-addresses" placeholder=""></textarea>
-                    <p class="import-help">Επιτρέπονται έως {{ $maximumStops }} διευθύνσεις.</p>
+                    <p class="import-help">
+                        Επιτρέπονται έως {{ $maximumStops }} διευθύνσεις.
+                        @if ($smsEnabled)
+                            Προαιρετικό κινητό στο τέλος:<br>
+                            Διεύθυνση, Τ.Κ., πόλη, 6912345678
+                        @endif
+                    </p>
                     <p class="import-error" id="import-error" hidden></p>
                     <div class="dialog-actions">
                         <button type="button" class="dialog-cancel">Ακύρωση</button>
@@ -151,13 +167,15 @@
                     <form method="post" action="{{ route('route-plans.update', $plan) }}" class="route-title-form">
                         @csrf
                         @method('PATCH')
+                        <h1 class="route-mode-title">
+                            {{ $plan->route_mode === 'ordered' ? 'Σειριακή διαδρομή' : 'Βελτιστοποιημένη διαδρομή' }}
+                        </h1>
                         <label for="route-plan-name">Όνομα διαδρομής</label>
                         <div>
                             <input id="route-plan-name" name="name" value="{{ $plan->name }}" required maxlength="120">
                             <button type="submit">Αποθήκευση</button>
                         </div>
                         <small>
-                            {{ $plan->route_mode === 'ordered' ? 'Σειριακή' : 'Βελτιστοποιημένη' }} ·
                             Ενημερώθηκε {{ $plan->updated_at->format('d/m/Y H:i') }}
                         </small>
                     </form>
@@ -181,10 +199,6 @@
                     </div>
                 </div>
 
-                @if ($plan->route_mode === 'ordered')
-                    <div class="route-constraint ordered-mode-badge">Σειριακή διαδρομή · χωρίς βελτιστοποίηση σειράς</div>
-                @endif
-
                 <div class="share-route">
                     <div class="share-route-links" style="--segment-count: {{ min(count($googleMapsLinks), 3) }}">
                         @foreach ($googleMapsLinks as $googleMapsLink)
@@ -192,18 +206,31 @@
                                 {{ count($googleMapsLinks) === 1 ? 'Άνοιγμα στο Google Maps' : 'Άνοιγμα τμήματος '.$loop->iteration }}
                             </a>
                         @endforeach
+                        <button type="button" id="share-dromos-route" data-url="{{ $shareUrl }}">
+                            Κοινοποίηση διαδρομής Dromos
+                        </button>
                     </div>
-                    <div class="copy-route-links" style="--segment-count: {{ min(count($googleMapsLinks), 3) }}">
-                        @foreach ($googleMapsLinks as $googleMapsLink)
-                            <button type="button" class="copy-google-link" data-link="{{ $googleMapsLink }}">
-                                {{ count($googleMapsLinks) === 1 ? 'Αντιγραφή συνδέσμου Google Maps' : 'Αντιγραφή Google Maps '.$loop->iteration }}
-                            </button>
-                        @endforeach
-                    </div>
-                    <button type="button" id="share-dromos-route" data-url="{{ $shareUrl }}">
-                        Κοινοποίηση διαδρομής Dromos
-                    </button>
                 </div>
+
+                <form
+                    method="post"
+                    action="{{ route('route-plans.options.update', $plan) }}"
+                    id="route-options-form"
+                >
+                    @csrf
+                    @method('PATCH')
+                    <input type="hidden" name="avoid_tolls" value="0">
+                    <label class="route-switch">
+                        <span>Αποφυγή διοδίων</span>
+                        <input
+                            type="checkbox"
+                            name="avoid_tolls"
+                            value="1"
+                            @checked($plan->avoid_tolls)
+                        >
+                        <span class="switch-track" aria-hidden="true"></span>
+                    </label>
+                </form>
 
                 <div class="fixed-origin">
                     <span class="origin-dot">S</span>
@@ -222,6 +249,8 @@
                         @foreach ($visits as $stop)
                             @php
                                 $googleMapsLocation = $stop->formatted_address ?: $stop->address;
+                                $notificationStatus = $smsEnabled ? $stop->latestNotification?->status : null;
+                                $notificationIsActive = $smsEnabled && in_array($notificationStatus, ['queued', 'sending', 'retrying', 'accepted', 'delivered'], true);
                                 $stopGoogleMapsUrl = 'https://www.google.com/maps/search/?'.http_build_query([
                                     'api' => 1,
                                     'query' => $googleMapsLocation,
@@ -235,13 +264,24 @@
                                 <div class="stop-copy">
                                     <strong>{{ $stop->address }}</strong>
                                     <small>{{ $stop->formatted_address }}</small>
+                                    @if ($smsEnabled && $stop->phone)
+                                        <small class="stop-phone">{{ $stop->phone }}</small>
+                                    @endif
                                     <small class="leg">
                                         {{ round($stop->leg_distance_meters / 1000, 1) }} km ·
                                         {{ max(1, round($stop->leg_duration_seconds / 60)) }} min
                                     </small>
                                     <span class="stop-actions">
-                                        <button type="button" class="edit-stop" data-address="{{ $stop->address }}" data-action="{{ route('route-plans.stops.update', [$plan, $stop]) }}">Επεξεργασία</button>
+                                        <button type="button" class="edit-stop" data-address="{{ $stop->address }}" data-phone="{{ $smsEnabled ? $stop->phone : '' }}" data-action="{{ route('route-plans.stops.update', [$plan, $stop]) }}">Επεξεργασία</button>
                                         <button type="button" class="delete-stop" data-action="{{ route('route-plans.stops.destroy', [$plan, $stop]) }}">Διαγραφή</button>
+                                        @if ($smsEnabled && $stop->phone)
+                                            <button
+                                                type="button"
+                                                class="notify-stop {{ $notificationIsActive ? 'is-sent' : '' }}"
+                                                data-action="{{ route('route-plans.stops.notifications.store', [$plan, $stop]) }}"
+                                                data-phone="{{ $stop->phone }}"
+                                            >{{ in_array($notificationStatus, ['queued', 'sending', 'retrying'], true) ? 'Σε αναμονή' : ($notificationIsActive ? 'Επανάληψη SMS' : 'Ειδοποίηση') }}</button>
+                                        @endif
                                         <a
                                             href="{{ $stopGoogleMapsUrl }}"
                                             target="_blank"
@@ -276,26 +316,6 @@
                     ＋ Προσθήκη στάσης
                 </button>
 
-                <form
-                    method="post"
-                    action="{{ route('route-plans.options.update', $plan) }}"
-                    id="route-options-form"
-                >
-                    @csrf
-                    @method('PATCH')
-                    <input type="hidden" name="avoid_tolls" value="0">
-                    <label class="route-switch">
-                        <span>Αποφυγή διοδίων</span>
-                        <input
-                            type="checkbox"
-                            name="avoid_tolls"
-                            value="1"
-                            @checked($plan->avoid_tolls)
-                        >
-                        <span class="switch-track" aria-hidden="true"></span>
-                    </label>
-                </form>
-
                 <button class="button button-wide save-order" form="route-order-form" disabled>
                     Επαναϋπολογισμός διαδρομής
                     <span>→</span>
@@ -307,6 +327,10 @@
                         <h2>Προσθήκη στάσης</h2>
                         <label for="add-stop-address">Πλήρης διεύθυνση</label>
                         <input id="add-stop-address" name="address" placeholder="Οδός και αριθμός, Τ.Κ., πόλη" required maxlength="255">
+                        @if ($smsEnabled)
+                            <label for="add-stop-phone">Κινητό (προαιρετικό)</label>
+                            <input id="add-stop-phone" name="phone" placeholder="6912345678" inputmode="tel">
+                        @endif
                         <div class="dialog-actions">
                             <button type="button" class="dialog-cancel">Ακύρωση</button>
                             <button class="button">Προσθήκη</button>
@@ -321,6 +345,10 @@
                         <h2>Ενημέρωση διεύθυνσης</h2>
                         <label for="edit-stop-address">Πλήρης διεύθυνση</label>
                         <input id="edit-stop-address" name="address" required maxlength="255">
+                        @if ($smsEnabled)
+                            <label for="edit-stop-phone">Κινητό (προαιρετικό)</label>
+                            <input id="edit-stop-phone" name="phone" placeholder="6912345678" inputmode="tel">
+                        @endif
                         <div class="dialog-actions">
                             <button type="button" class="dialog-cancel">Ακύρωση</button>
                             <button class="button">Αποθήκευση</button>
@@ -332,6 +360,11 @@
                     @csrf
                     @method('DELETE')
                 </form>
+                @if ($smsEnabled)
+                    <form method="post" id="notify-stop-form" hidden>
+                        @csrf
+                    </form>
+                @endif
             @endif
         </aside>
 
@@ -369,6 +402,9 @@
             <span class="input-number"></span>
             <div>
                 <input data-name="address" placeholder="Οδός και αριθμός, Τ.Κ., πόλη" required>
+                @if ($smsEnabled)
+                    <input class="stop-phone-input" data-name="phone" placeholder="Κινητό (προαιρετικό)" inputmode="tel">
+                @endif
             </div>
             <button type="button" class="remove" aria-label="Αφαίρεση στάσης">×</button>
         </div>
@@ -385,9 +421,11 @@
             const importTextarea = document.querySelector('#import-addresses');
             const importError = document.querySelector('#import-error');
 
-            function createStopRow(address = '') {
+            function createStopRow(address = '', phone = '') {
                 const row = stopTemplate.content.cloneNode(true);
                 row.querySelector('[data-name="address"]').value = address;
+                const phoneInput = row.querySelector('[data-name="phone"]');
+                if (phoneInput) phoneInput.value = phone;
 
                 return row;
             }
@@ -423,18 +461,34 @@
             importDialog.querySelector('.dialog-cancel').addEventListener('click', () => importDialog.close());
 
             document.querySelector('#apply-import-addresses').addEventListener('click', () => {
-                const addresses = importTextarea.value
+                const rows = importTextarea.value
                     .split(/\r?\n/)
-                    .map((address) => address.trim())
+                    .map((line) => line.trim())
                     .filter(Boolean);
 
-                if (addresses.length < 2 || addresses.length > {{ $maximumStops }}) {
+                if (rows.length < 2 || rows.length > {{ $maximumStops }}) {
                     importError.textContent = 'Εισαγάγετε από 2 έως {{ $maximumStops }} διευθύνσεις, μία σε κάθε γραμμή.';
                     importError.hidden = false;
                     return;
                 }
 
-                stopList.replaceChildren(...addresses.map((address) => createStopRow(address)));
+                const stops = rows.map((line) => {
+                    @if (! $smsEnabled)
+                    return { address: line, phone: '' };
+                    @else
+                    const parts = line.split(',');
+                    const possiblePhone = parts.at(-1).trim();
+                    const phoneDigits = possiblePhone.replace(/\D/g, '');
+                    const hasPhone = /^(?:0030|30)?69\d{8}$/.test(phoneDigits);
+
+                    return {
+                        address: hasPhone ? parts.slice(0, -1).join(',').trim() : line,
+                        phone: hasPhone ? possiblePhone : '',
+                    };
+                    @endif
+                });
+
+                stopList.replaceChildren(...stops.map((stop) => createStopRow(stop.address, stop.phone)));
                 renumberStops();
                 importDialog.close();
             });
@@ -459,7 +513,9 @@
             const editStopDialog = document.querySelector('#edit-stop-dialog');
             const editStopForm = document.querySelector('#edit-stop-form');
             const editStopAddress = document.querySelector('#edit-stop-address');
+            const editStopPhone = document.querySelector('#edit-stop-phone');
             const deleteStopForm = document.querySelector('#delete-stop-form');
+            const notifyStopForm = document.querySelector('#notify-stop-form');
             const routeOptionsForm = document.querySelector('#route-options-form');
             const avoidTollsToggle = routeOptionsForm.querySelector('[name="avoid_tolls"][type="checkbox"]');
             let draggedStop = null;
@@ -490,13 +546,6 @@
                 routeOptionsForm.style.opacity = '.65';
                 routeOptionsForm.requestSubmit();
             });
-
-            document.querySelectorAll('.copy-google-link').forEach((button) => button.addEventListener('click', async () => {
-                const originalLabel = button.textContent;
-                await navigator.clipboard.writeText(button.dataset.link);
-                button.textContent = 'Αντιγράφηκε!';
-                setTimeout(() => button.textContent = originalLabel, 1800);
-            }));
 
             document.querySelector('#share-dromos-route').addEventListener('click', async (event) => {
                 const button = event.currentTarget;
@@ -568,6 +617,7 @@
                 if (event.target.matches('.edit-stop')) {
                     editStopForm.action = event.target.dataset.action;
                     editStopAddress.value = event.target.dataset.address;
+                    if (editStopPhone) editStopPhone.value = event.target.dataset.phone;
                     editStopDialog.showModal();
                     editStopAddress.focus();
                 }
@@ -575,6 +625,15 @@
                 if (event.target.matches('.delete-stop') && confirm('Να διαγραφεί αυτή η στάση;')) {
                     deleteStopForm.action = event.target.dataset.action;
                     deleteStopForm.submit();
+                }
+
+                if (event.target.matches('.notify-stop')) {
+                    const phone = event.target.dataset.phone;
+
+                    if (confirm(`Να σταλεί SMS στο ${phone};`)) {
+                        notifyStopForm.action = event.target.dataset.action;
+                        notifyStopForm.submit();
+                    }
                 }
             });
 
@@ -652,9 +711,9 @@
         </script>
     @endif
 
-    @if ($plan && $browserKey)
+    @if ($browserKey)
         @php
-            $mapStops = $plan->stops->map(fn ($stop) => [
+            $mapStops = $plan?->stops->map(fn ($stop) => [
                 'id' => $stop->id,
                 'lat' => $stop->latitude,
                 'lng' => $stop->longitude,
@@ -665,16 +724,20 @@
                     'api' => 1,
                     'query' => $stop->formatted_address ?: $stop->address,
                 ]),
-            ]);
+            ]) ?? collect();
+            $routePolylines = $plan
+                ? ($plan->encoded_polylines ?: array_values(array_filter([$plan->encoded_polyline])))
+                : [];
         @endphp
 
         <script>
             window.dromosStops = @json($mapStops);
 
-            window.dromosPolylines = @json($plan->encoded_polylines ?: array_values(array_filter([$plan->encoded_polyline])));
+            window.dromosPolylines = @json($routePolylines);
+            window.dromosColoredRoutes = @json($coloredRoutes ?? []);
 
             window.initDromosMap = () => {
-                const mapViewStorageKey = 'dromos.map-view.{{ $plan->id }}';
+                const mapViewStorageKey = 'dromos.map-view.{{ $plan?->id ?? 'create-'.$plannerMode }}';
 
                 const savedMapView = (() => {
                     try {
@@ -705,6 +768,46 @@
 
                 const bounds = new google.maps.LatLngBounds();
                 const markers = new Map();
+
+                window.dromosColoredRoutes.forEach((coloredRoute, index) => {
+                    const path = coloredRoute.encodedPolyline
+                        ? google.maps.geometry.encoding.decodePath(coloredRoute.encodedPolyline)
+                        : coloredRoute.path;
+
+                    if (! path?.length) return;
+                    path.forEach((point) => bounds.extend(point));
+
+                    if (coloredRoute.isCircular) {
+                        new google.maps.Polygon({
+                            map,
+                            paths: path,
+                            clickable: false,
+                            fillColor: coloredRoute.color,
+                            fillOpacity: .12,
+                            strokeOpacity: 0,
+                            zIndex: index * 3 + 1,
+                        });
+                    }
+
+                    new google.maps.Polyline({
+                        map,
+                        path,
+                        clickable: false,
+                        strokeColor: '#ffffff',
+                        strokeOpacity: .85,
+                        strokeWeight: 10,
+                        zIndex: index * 3 + 2,
+                    });
+                    new google.maps.Polyline({
+                        map,
+                        path,
+                        clickable: false,
+                        strokeColor: coloredRoute.color,
+                        strokeOpacity: .9,
+                        strokeWeight: 6,
+                        zIndex: index * 3 + 3,
+                    });
+                });
 
                 window.dromosStops.forEach((stop) => {
                     const marker = new google.maps.Marker({
@@ -754,11 +857,14 @@
                 });
 
                 window.dromosPolylines.forEach((encodedPolyline) => {
+                    const path = google.maps.geometry.encoding.decodePath(encodedPolyline);
+                    path.forEach((point) => bounds.extend(point));
                     new google.maps.Polyline({
                         map,
-                        path: google.maps.geometry.encoding.decodePath(encodedPolyline),
+                        path,
                         strokeColor: '#1f5c43',
                         strokeWeight: 5,
+                        zIndex: 1000,
                     });
                 });
 
@@ -784,7 +890,7 @@
 
                 map.addListener('idle', window.persistDromosMapView);
 
-                if (! savedMapView) {
+                if (! savedMapView && ! bounds.isEmpty()) {
                     map.fitBounds(bounds, 60);
                 }
             };
