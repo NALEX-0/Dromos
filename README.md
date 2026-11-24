@@ -9,6 +9,8 @@ Dromos is a Laravel web application for planning multi-stop driving routes in Gr
 
 Both modes support toll avoidance, return to start, bulk address import, drag-and-drop ordering, address addition/editing/deletion, automatic recalculation, multiple route polylines, segmented Google Maps links, and secure read-only Dromos sharing links for authenticated users.
 
+Administrators can save multiple global colored reference routes. Each reference route can be edited, deleted, enabled, or disabled; enabled routes are drawn beneath every user's map while creating or viewing either a sequential or optimized route.
+
 ## API usage and stored data
 
 Dromos keeps Google integrations behind the `Geocoder` and `RouteOptimizer` contracts. Geocoding and routing credentials remain server-side; the separately restricted browser key is used only to render Google Maps.
@@ -20,6 +22,7 @@ The main database tables have distinct API-saving responsibilities:
 | `route_plans` | Stores route mode, options, total distance/duration, encoded polylines, and the provider response. | Reopening or refreshing an unchanged saved route does not call the Geocoding or Routes API again. The browser map may still count as a Maps JavaScript load. |
 | `stops` | Stores the start and destinations, verified coordinates, Place IDs, order, and leg estimates. | Reordering, deleting, or recalculating an existing route reuses stored coordinates and does not geocode unchanged stops. A Routes API call is still required to calculate the changed road route. |
 | `geocoded_address_cache` | Stores normalized addresses and their verified coordinates across all routes. | Reusing the same address in another route avoids another Geocoding API request. `hit_count` measures these cross-route/cache lookups, not ordinary route recalculations. |
+| `colored_routes` | Stores the administrators' global named reference routes, colors, addresses, calculated road geometry, and visibility state. | Creating or editing recalculates the route, but enabling, disabling, reopening, and displaying the saved geometry does not call the Geocoding or Routes API again. |
 
 
 ## Local setup
@@ -35,6 +38,12 @@ npm install
 php artisan key:generate
 php artisan migrate
 composer run dev
+```
+
+SMS notifications are temporarily disabled by default. The implementation and database tables remain available for later use. To restore the feature, set `SMS_FEATURE_ENABLED=true`; for native development, also start a queue worker in a separate terminal:
+
+```bash
+php artisan queue:work --queue=sms,default --tries=3 --timeout=30
 ```
 
 Open the local URL shown by Laravel and select **Εγγραφή** to create your first account.
@@ -80,7 +89,9 @@ MYSQL_ROOT_PASSWORD=choose-a-different-root-password
 docker compose up -d --build
 ```
 
-The application waits for MySQL, applies the `dro_` table prefix, and runs database migrations automatically. Open [http://localhost:4000](http://localhost:4000), select **Εγγραφή**, and create your account.
+The application waits for MySQL, applies the `dro_` table prefix, and runs database migrations. Open [http://localhost:4000](http://localhost:4000), select **Εγγραφή**, and create your account.
+
+The Docker SMS worker is commented out while SMS is disabled. To restore SMS later, set `SMS_FEATURE_ENABLED=true` in `.env.docker`, uncomment the `worker` service in `compose.yaml`, and rebuild the containers.
 
 Useful Docker commands:
 
