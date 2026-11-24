@@ -6,6 +6,7 @@ use App\Contracts\Geocoder;
 use App\Contracts\RouteOptimizer;
 use App\Contracts\SmsGateway;
 use App\Services\CachedGeocoder;
+use App\Services\ApiRequestRecorder;
 use App\Services\Demo\DemoGeocoder;
 use App\Services\Demo\DemoRouteOptimizer;
 use App\Services\Google\GoogleGeocoder;
@@ -25,7 +26,10 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(Geocoder::class, function ($app) use ($google) {
             $provider = $google ? GoogleGeocoder::class : DemoGeocoder::class;
 
-            return new CachedGeocoder($app->make($provider));
+            return new CachedGeocoder(
+                $app->make($provider),
+                $app->make(ApiRequestRecorder::class),
+            );
         });
         $this->app->bind(RouteOptimizer::class, $google ? GoogleRouteOptimizer::class : DemoRouteOptimizer::class);
         $this->app->bind(

@@ -10,7 +10,10 @@ use Illuminate\Support\Str;
 
 final readonly class CachedGeocoder implements Geocoder
 {
-    public function __construct(private Geocoder $geocoder) {}
+    public function __construct(
+        private Geocoder $geocoder,
+        private ?ApiRequestRecorder $requestRecorder = null,
+    ) {}
 
     public function geocode(string $address): GeocodedAddress
     {
@@ -22,6 +25,7 @@ final readonly class CachedGeocoder implements Geocoder
         if ($cached) {
             $cached->increment('hit_count');
             $cached->update(['last_used_at' => now()]);
+            $this->requestRecorder?->record('geocoding', 'geocode', 'success', 0, cacheHit: true);
 
             return $this->toData($cached);
         }
