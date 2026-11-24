@@ -29,13 +29,15 @@ class RoutePlanController extends Controller
         ]);
 
         $routes = RoutePlan::query()
-            ->where('user_id', $request->user()->id)
+            ->when(! $request->user()->isAdmin(), fn ($query) => $query->where('user_id', $request->user()->id))
+            ->with('user')
             ->with(['stops' => fn ($query) => $query->where('type', 'start')])
             ->withCount(['stops as stops_count' => fn ($query) => $query->where('type', 'visit')])
             ->when($filters['q'] ?? null, function ($query, $search) {
                 $query->where(function ($query) use ($search) {
                     $query
                         ->where('name', 'like', "%{$search}%")
+                        ->orWhereHas('user', fn ($users) => $users->where('email', 'like', "%{$search}%"))
                         ->orWhereHas('stops', fn ($stops) => $stops->where('address', 'like', "%{$search}%"));
                 });
             })

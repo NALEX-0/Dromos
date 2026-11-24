@@ -15,6 +15,7 @@ class AuthenticationTest extends TestCase
     {
         $this->get('/')->assertRedirect(route('login'));
         $this->get(route('ordered-route-plans.create'))->assertRedirect(route('login'));
+        $this->get(route('optimized-route-plans.create'))->assertRedirect(route('login'));
     }
 
     public function test_a_guest_can_register(): void

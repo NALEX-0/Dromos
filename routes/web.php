@@ -42,4 +42,21 @@ Route::middleware('auth')->group(function () {
         Route::post('/routes/{routePlan}/stops/{stop}/notifications', [RoutePlanController::class, 'notifyStop'])->name('route-plans.stops.notifications.store');
     }
     Route::delete('/routes/{routePlan}/stops/{stop}', [RoutePlanController::class, 'destroyStop'])->name('route-plans.stops.destroy');
+
+    Route::middleware('admin')->group(function () {
+        Route::get('/colored-routes', [ColoredRouteController::class, 'index'])->name('colored-routes.index');
+        Route::post('/colored-routes', [ColoredRouteController::class, 'store'])->name('colored-routes.store');
+        Route::patch('/colored-routes/{coloredRoute}', [ColoredRouteController::class, 'update'])->name('colored-routes.update');
+        Route::patch('/colored-routes/{coloredRoute}/toggle', [ColoredRouteController::class, 'toggle'])->name('colored-routes.toggle');
+        Route::delete('/colored-routes/{coloredRoute}', [ColoredRouteController::class, 'destroy'])->name('colored-routes.destroy');
+    });
+
+    Route::middleware('admin')->prefix('admin')->name('admin.')->group(function () {
+        Route::get('/', [AdminController::class, 'dashboard'])->name('dashboard');
+        Route::get('/routes', [AdminController::class, 'routes'])->name('routes');
+        if (config('services.sms.enabled')) {
+            Route::get('/sms', [AdminController::class, 'sms'])->name('sms');
+        }
+        Route::get('/api-usage', [AdminController::class, 'apiUsage'])->name('api-usage');
+    });
 });

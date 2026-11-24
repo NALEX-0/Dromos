@@ -31,7 +31,11 @@ class AuthController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('route-plans.create'));
+        $destination = $request->user()->isAdmin()
+            ? route('admin.dashboard')
+            : route('route-plans.create');
+
+        return redirect()->intended($destination);
     }
 
     public function showRegister(): View
