@@ -46,7 +46,7 @@ SMS notifications are temporarily disabled by default. The implementation and da
 php artisan queue:work --queue=sms,default --tries=3 --timeout=30
 ```
 
-Open the local URL shown by Laravel and select **Εγγραφή** to create your first account.
+Open the local URL shown by Laravel and sign in with an existing account. Public registration is disabled.
 
 The application currently uses MySQL/MariaDB. Configure a database in `.env`:
 
@@ -89,7 +89,7 @@ MYSQL_ROOT_PASSWORD=choose-a-different-root-password
 docker compose up -d --build
 ```
 
-The application waits for MySQL, applies the `dro_` table prefix, and runs database migrations. Open [http://localhost:4000](http://localhost:4000), select **Εγγραφή**, and create your account.
+The application waits for MySQL, applies the `dro_` table prefix, and runs database migrations. Open [http://localhost:4000](http://localhost:4000) and sign in with an existing account.
 
 The Docker SMS worker is commented out while SMS is disabled. To restore SMS later, set `SMS_FEATURE_ENABLED=true` in `.env.docker`, uncomment the `worker` service in `compose.yaml`, and rebuild the containers.
 

@@ -18,24 +18,16 @@ class AuthenticationTest extends TestCase
         $this->get(route('optimized-route-plans.create'))->assertRedirect(route('login'));
     }
 
-    public function test_a_guest_can_register(): void
+    public function test_public_registration_is_disabled(): void
     {
-        $this->get(route('register'))
+        $this->get(route('login'))
             ->assertOk()
-            ->assertSee('Δημιουργία λογαριασμού');
+            ->assertDontSee('Δημιουργία λογαριασμού')
+            ->assertDontSee('Εγγραφή');
 
-        $this->post(route('register'), [
-            'name' => 'Νίκος',
-            'email' => 'nikos@example.com',
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
-        ])->assertRedirect(route('route-plans.create'));
-
-        $this->assertAuthenticated();
-        $this->assertDatabaseHas('users', [
-            'name' => 'Νίκος',
-            'email' => 'nikos@example.com',
-        ]);
+        $this->get('/register')->assertNotFound();
+        $this->post('/register')->assertNotFound();
+        $this->assertGuest();
     }
 
     public function test_a_user_can_log_in_and_log_out(): void

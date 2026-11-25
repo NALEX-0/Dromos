@@ -114,8 +114,8 @@
                 </a>
 
                 <div class="guest-nav">
-                    <a href="{{ route('login') }}">Σύνδεση</a>
-                    <a href="{{ route('register') }}" class="guest-register">Εγγραφή</a>
+                    {{-- <a href="{{ route('login') }}">Σύνδεση</a> --}}
+                    {{-- <a href="{{ route('register') }}" class="guest-register">Εγγραφή</a> --}}
                 </div>
             </nav>
 
